@@ -6,8 +6,17 @@ For terminal users who want the condensed recipe. Full prose + troubleshooting:
 ## Prereqs
 
 - macOS (arm64 or x64)
-- Homebrew, Claude Desktop, a Google account
+- Google account
+- Claude Desktop installed ([claude.ai/download](https://claude.ai/download))
 - ~10 minutes
+
+**Node is NOT required** — Claude Desktop bundles its own Node runtime for MCP extensions.
+
+### 0. Install Homebrew (if you don't have it)
+
+```bash
+brew --version 2>/dev/null || /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
 
 ## Commands
 

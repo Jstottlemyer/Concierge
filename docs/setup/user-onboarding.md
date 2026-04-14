@@ -12,11 +12,19 @@ This is the one-time setup a user runs **before** installing the Concierge `.mcp
 
 ## Prerequisites
 
-- macOS (Darwin) — v1 is macOS-only
-- Google account (Gmail or Workspace)
-- Homebrew installed (`brew --version`)
-- Claude Desktop installed
-- *Optional but easier:* `gcloud` CLI installed (`brew install --cask google-cloud-sdk`) — lets you use `gws auth setup` which automates project creation
+- **macOS** (Darwin) — v1 is macOS-only (Apple Silicon or Intel)
+- **Google account** — Gmail or Google Workspace
+- **Claude Desktop** — download from [claude.ai/download](https://claude.ai/download) if you don't have it
+- **Homebrew** — macOS package manager. Install if missing:
+  ```bash
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  ```
+  Verify: `brew --version` (should print `Homebrew 4.x` or similar)
+- *Optional but recommended:* `gcloud` CLI — `brew install --cask google-cloud-sdk`. Lets you use `gws auth setup` (automated Cloud project creation) and the `./build/enable-apis.sh` helper. Without it, you'll use the Cloud Console UI instead.
+
+### Node / npm — NOT needed
+
+Concierge runs as a Claude Desktop extension (`.mcpb`). Claude Desktop includes its own bundled Node.js runtime and executes the MCP server inside it. You do **not** need to install Node, npm, or pnpm as an end user. These are only required if you're building Concierge from source.
 
 ---
 
