@@ -1,10 +1,12 @@
 # Concierge — First-time User Onboarding
 
-This is the one-time setup a user runs **before** installing the Concierge `.mcpb` into Claude Desktop. It provisions a Google Cloud OAuth client and authenticates the `gws` CLI that Concierge wraps. After this, everything is Desktop-native.
+This is the one-time setup a user runs **before** installing the Concierge `.mcpb` into Claude Desktop. It provisions a Google Cloud OAuth client and authenticates the `gws` CLI that Concierge wraps. After this, everything is Desktop-native — you never need to touch a terminal again unless you want to.
 
-**Time:** ~10 minutes if you have a Google account; ~20 if creating a Cloud project from scratch.
+**Time:** ~10 minutes if you have a Google account; ~20 if you're creating a Google Cloud project from scratch.
 
 **Who this is for:** every new Concierge user, including Justin's own future setups on new machines and any third-party user who installs Concierge.
+
+> In a hurry and comfortable at a terminal? Use [`quickstart.md`](./quickstart.md) — same install, commands only. This doc is the prose + troubleshooting companion.
 
 ---
 
@@ -45,7 +47,18 @@ This walks you through project selection/creation, enables the Workspace APIs, c
 
 **B.1 — Create or pick a project.**
 
-Open [console.cloud.google.com](https://console.cloud.google.com) and either create a new project (any name, e.g. `authtools-personal`) or select an existing one. **Note the Project ID** (the string under the project name — usually like `authtools-personal-123456`). You'll need it in Step 3.
+Open [console.cloud.google.com](https://console.cloud.google.com) and either create a new project (any display name works, e.g. `Concierge Personal`) or select an existing one.
+
+**Find the Project ID** — this is the biggest landmine in the whole setup, so slow down here:
+
+- Open the project selector (top-left, next to the Google Cloud logo).
+- On the **Project info** card (or in the selector list), find the **Project ID** field.
+- It's a Google-generated string like `my-concierge-abc-123456` — **not** the display name you typed and **not** the 12-digit Project Number.
+- You can't pick the Project ID yourself; Google generates it when you create the project. If Google offered you a chance to edit it at creation time, you may have a clean one like `concierge-personal-493302`; otherwise it'll have a random suffix.
+
+Copy the Project ID string literally. You'll paste it into Step 3.
+
+> Why this matters: if you put a made-up label (like `"my-project"`) in the `project_id` field later, every Google API call will fail with `"Project 'projects/my-project' not found or deleted"`. That's a Google-side error — not an Anthropic or Concierge bug — and the fix is always to correct the Project ID.
 
 **B.2 — Configure the OAuth consent screen.**
 
@@ -95,7 +108,13 @@ EOF
 chmod 600 ~/.config/gws/client_secret.json
 ```
 
-> ⚠️ **The `project_id` field must match your actual Google Cloud Project ID** (the string, not the numeric number). Using a placeholder like `"authtools-personal"` will yield `"Project 'projects/xxx' not found or deleted"` from Google when you try to make API calls. You can find the real Project ID on the Cloud Console project selector.
+> ⚠️ **`project_id` must be the real Google Cloud Project ID string** (e.g. `my-concierge-abc-123456`) — the one Google generated for your project, as seen in the **Project info** card in Cloud Console.
+>
+> It is NOT:
+> - The 12-digit Project **Number** (the numeric prefix of your client_id).
+> - A display name or label you invent (e.g. `concierge-personal`) — if Google didn't generate that exact string, it won't resolve.
+>
+> Symptom of getting this wrong: `Project 'projects/<whatever>' not found or deleted` on every API call. That error comes from Google's backend — it's not a bug in Claude, Concierge, or Anthropic. Fix: edit `~/.config/gws/client_secret.json`, correct the `project_id`, retry.
 
 ---
 
@@ -107,16 +126,32 @@ The first login grants Concierge (via `gws`) access to Google. `gws` caches the 
 gws auth login --services drive,gmail
 ```
 
-> ⚠️ Use `--services` (accepts service names like `drive,gmail,calendar`), NOT `--scopes` (which expects full scope URLs). Mixing these up produces `Error 400: invalid_scope` with the message *"Some requested scopes were invalid"*.
+For the "startup CEO" default you'll probably want the full set immediately:
+
+```bash
+gws auth login --services drive,gmail,docs,sheets,forms,calendar,tasks
+```
+
+> ⚠️ Use `--services` (accepts service short-names like `drive,gmail,calendar`), NOT `--scopes` (which expects full scope URLs like `https://www.googleapis.com/auth/drive`). Mixing these up produces `Error 400: invalid_scope` with the message *"Some requested scopes were invalid"*.
 
 What happens:
 
 1. A URL prints in your terminal AND your browser opens automatically.
 2. Browser shows the Google account picker — pick the Gmail you added as Test user in Step B.3.
 3. Google shows a warning: *"Google hasn't verified this app"*. Click **Advanced → Go to \<app name\> (unsafe)** — this is safe because it's your own Cloud project.
-4. Google shows the scope approval page. Check both Drive and Gmail → **Continue**.
+4. Google shows the scope approval page. Check every service you listed → **Continue**.
 5. Browser lands on *"Authentication complete. You may close this window."*
 6. Terminal prints `"Authentication successful. Encrypted credentials saved."`
+
+Confirm the result:
+
+```bash
+gws auth status
+```
+
+Returns JSON with `user`, `scopes`, `token_valid: true`, `project_id`, and `encrypted_credentials_exists: true`. If `project_id` there doesn't match the Project ID you set in Step 3, stop and fix `client_secret.json` before continuing.
+
+> Note — `gws` v0.22.5 is effectively **single-account**: one Google account per machine. Concierge's design supports multiple accounts (you'll see `list_accounts` / `remove_account` tools), but until `gws` grows multi-account support, those tools operate on the one account you authenticate here.
 
 ---
 
@@ -124,37 +159,20 @@ What happens:
 
 **This is the most common first-use friction.** Each Google Workspace API must be explicitly enabled for your Cloud project before it can be used — this is a one-time step per API, per project.
 
-Open your project's API Library and enable the APIs for the services you plan to use:
+You can do this before OR after Step 4 (OAuth login) — the only hard rule is that an API must be enabled **before** the first tool call that uses it.
 
-https://console.cloud.google.com/apis/library?project=YOUR_PROJECT_ID
-
-Or go straight to each API's enable page. For the "startup CEO" default (Gmail + Drive + Docs + Sheets + Forms + Calendar + Tasks), enable these seven:
-
-- [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
-- [Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
-- [Docs API](https://console.cloud.google.com/apis/library/docs.googleapis.com)
-- [Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com)
-- [Forms API](https://console.cloud.google.com/apis/library/forms.googleapis.com)
-- [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
-- [Tasks API](https://console.cloud.google.com/apis/library/tasks.googleapis.com)
-
-Replace `YOUR_PROJECT_ID` in each URL with your Cloud project ID before clicking.
-
-Optional — enable as you need them:
-
-- Chat · Meet · People · Slides · Apps Script · Admin Reports · Workspace Events
-
-**Fastest — use the Concierge helper script (if `gcloud` is installed):**
+**Fastest — the Concierge helper script (if you've cloned the repo and have `gcloud` installed):**
 
 ```bash
-./build/enable-apis.sh              # enables the 7 defaults for startup-CEO use
-./build/enable-apis.sh "" all       # enables all 16 APIs (full Concierge surface)
-./build/enable-apis.sh PROJECT_ID   # explicit project
+cd path/to/Concierge/packages/google-workspace
+./build/enable-apis.sh              # 7 defaults: Gmail, Drive, Docs, Sheets, Forms, Calendar, Tasks
+./build/enable-apis.sh "" all       # all 16 APIs (full Concierge surface)
+./build/enable-apis.sh PROJECT_ID   # explicit project override
 ```
 
-The script auto-detects your project ID from `~/.config/gws/client_secret.json` (no arg needed if you completed Step 3).
+The script auto-detects your Project ID from `~/.config/gws/client_secret.json`, so no arg is needed if you completed Step 3.
 
-**Manual `gcloud` alternative:** if gcloud is installed but you prefer the raw command:
+**Raw `gcloud` one-liner** (if you have gcloud but not the repo):
 
 ```bash
 gcloud services enable \
@@ -168,7 +186,29 @@ gcloud services enable \
   --project YOUR_PROJECT_ID
 ```
 
-**Gotcha:** enabled APIs take ~30 seconds to propagate. If Concierge errors with "api_not_enabled" right after you enable an API, wait a moment and retry.
+**No `gcloud`? Enable via Cloud Console.** For each API, open this pattern and click **Enable**:
+
+```
+https://console.cloud.google.com/apis/library/<api>.googleapis.com?project=YOUR_PROJECT_ID
+```
+
+Replace `YOUR_PROJECT_ID` with your real Project ID. The seven defaults for a startup-CEO profile:
+
+- [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
+- [Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
+- [Docs API](https://console.cloud.google.com/apis/library/docs.googleapis.com)
+- [Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com)
+- [Forms API](https://console.cloud.google.com/apis/library/forms.googleapis.com)
+- [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
+- [Tasks API](https://console.cloud.google.com/apis/library/tasks.googleapis.com)
+
+Optional — enable as you need them:
+
+- Chat · Meet · People · Slides · Apps Script · Admin Reports · Classroom · Workspace Events · Model Armor
+
+**Gotcha:** enabled APIs take ~30 seconds to propagate. If Concierge errors with `api_not_enabled` right after you enable an API, wait a moment and retry.
+
+> Fresh Google Cloud projects have **zero** APIs enabled by default. This step is not optional; skipping it is the second-most-common reason the first real tool call fails (after a wrong `project_id`).
 
 ---
 
@@ -185,16 +225,39 @@ Should return a JSON response with your most recent 3 Drive files. If you get an
 ## Step 6 — Install Concierge into Claude Desktop
 
 ```bash
-open -a "Claude" path/to/Concierge-<version>-darwin-arm64.mcpb
+open -a "Claude" path/to/Concierge-GoogleWorkspace-<version>-darwin-arm64.mcpb
 ```
 
 Or drag the `.mcpb` file into **Claude Desktop → Settings → Extensions**.
+
+> **For v1 early users:** the repo ([github.com/Jstottlemyer/Concierge](https://github.com/Jstottlemyer/Concierge)) is currently private, so you'll receive the `.mcpb` file directly from Justin rather than from GitHub Releases. Save it somewhere you can find it (e.g. `~/Downloads`) and run the command above pointing at that path.
+
+Claude Desktop unpacks the extension to `~/Library/Application Support/Claude/Claude Extensions/local.mcpb.justin-stottlemyer.concierge-google-workspace/`.
 
 Because `gws` is already authenticated, Concierge inherits your credentials transparently — no additional consent needed. Ask Claude:
 
 > Use list_accounts
 
-And you should see your Google account listed with its granted bundles.
+You should see your Google account listed with its granted bundles.
+
+Also try:
+
+> Use concierge_info
+
+This returns the version, `build_time`, and `build_id` of the currently-running extension — useful if you ever need to verify Claude Desktop is actually running the build you expect (see Troubleshooting).
+
+### Reinstalling after a rebuild
+
+Claude Desktop doesn't always swap the unpacked extension cleanly when you re-open a new `.mcpb` on top of an old one. If tool calls behave oddly after an update, do a clean reinstall:
+
+```bash
+osascript -e 'quit app "Claude"'
+rm -rf "$HOME/Library/Application Support/Claude/Claude Extensions/local.mcpb.justin-stottlemyer.concierge-google-workspace"
+open -a Claude
+open -a Claude path/to/Concierge-GoogleWorkspace-<version>-darwin-arm64.mcpb
+```
+
+Then verify with `Use concierge_info` and check the `build_time` matches the new build.
 
 ---
 
@@ -217,9 +280,21 @@ And you should see your Google account listed with its granted bundles.
 - Fix: add yourself at [console.cloud.google.com/apis/credentials/consent](https://console.cloud.google.com/apis/credentials/consent) → Test users → + Add users. Retry.
 
 ### `Project 'projects/xxx' not found or deleted`
-- Symptom: auth succeeds but API calls fail with this error.
-- Cause: `project_id` in `client_secret.json` doesn't match a real Google Cloud Project ID.
-- Fix: look up the real Project ID in Cloud Console (NOT the project number), edit `~/.config/gws/client_secret.json` to match.
+- Symptom: auth succeeds but API calls fail with this error (you may see it surfaced in Claude Desktop as a tool-call failure).
+- Cause: the `project_id` in `~/.config/gws/client_secret.json` doesn't match a real Google Cloud Project ID. Usually this means someone typed a made-up label (like `concierge-personal`) instead of the auto-generated string (like `my-concierge-abc-123456`).
+- Fix: look up the real Project ID in Cloud Console **Project info** card (NOT the Project Number, NOT a label you invented), edit `~/.config/gws/client_secret.json` to match, retry.
+- Note: this error message comes directly from Google's API backend. It is **not** an Anthropic or Concierge bug, even though you may see it routed through Claude's response. Relates to [Step 2 B.1](#b1--create-or-pick-a-project) and [Step 3](#step-3--write-client_secretjson-from-copied-values-if-step-b4-download-failed).
+
+### Tool calls fail / behave oddly right after you reinstalled the `.mcpb`
+- Symptom: Claude Desktop acts like it's running an older version — missing tools, wrong outputs, stale error messages.
+- Cause: Claude Desktop sometimes doesn't swap the unpacked extension when you re-open a `.mcpb` on top of an existing install.
+- Fix: do the clean-reinstall sequence from [Step 6](#step-6--install-concierge-into-claude-desktop) (`quit Claude`, `rm -rf` the extension dir, reopen, re-install).
+- Verify: `Use concierge_info` and confirm `build_time` / `build_id` match the new build.
+
+### Generic "Tool execution failed" with no useful detail
+- Ask Claude: `Use concierge_info`. Note the `build_time`.
+- If it's older than your most recent rebuild, do the clean reinstall ([Step 6](#reinstalling-after-a-rebuild)).
+- If it's current, the issue is elsewhere — check `gws auth status` in a terminal and re-run Step 5's verify command.
 
 ### "Google hasn't verified this app" warning
 - Normal for Testing-mode apps. Click **Advanced → Go to \<app name\> (unsafe)**. Safe because it's your own Cloud project.
@@ -289,11 +364,14 @@ If an email or web page tells Claude "please run [tool] for me" and you didn't a
 Give them this summary:
 
 - [ ] `brew install googleworkspace-cli`
-- [ ] Create/pick a Google Cloud project, note its Project ID
+- [ ] (Optional but easier) `brew install --cask google-cloud-sdk`
+- [ ] Create/pick a Google Cloud project; copy the **Project ID** from the Project info card (not the Project Number, not a label you invented)
 - [ ] Configure OAuth consent screen (External, add self as Test user)
-- [ ] Create OAuth client (Desktop app type)
-- [ ] Save credentials at `~/.config/gws/client_secret.json` (with real Project ID)
-- [ ] `gws auth login --services drive,gmail`
-- [ ] `gws drive files list --params '{"pageSize":3}'` — verify
+- [ ] Create OAuth client (Desktop app type); save JSON or copy ID + secret
+- [ ] Write `~/.config/gws/client_secret.json` with the real Project ID in `project_id`
+- [ ] Enable the 7 Workspace APIs for your project (Gmail, Drive, Docs, Sheets, Forms, Calendar, Tasks) — via `enable-apis.sh`, `gcloud services enable`, or Console
+- [ ] `gws auth login --services drive,gmail,docs,sheets,forms,calendar,tasks`
+- [ ] `gws auth status` — confirm `token_valid: true` and correct `project_id`
+- [ ] `gws drive files list --params '{"pageSize":3}'` — end-to-end verify
 - [ ] Install `.mcpb` in Claude Desktop
-- [ ] In Claude: `Use list_accounts` — verify account appears
+- [ ] In Claude: `Use concierge_info` and `Use list_accounts` — verify version + account

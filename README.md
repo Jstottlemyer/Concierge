@@ -33,11 +33,18 @@ Claude Desktop already includes hosted connectors for Gmail, Calendar, and Drive
 
 ### Install
 
-1. Complete one-time Google Cloud setup: **see [docs/setup/user-onboarding.md](docs/setup/user-onboarding.md)** (~10 minutes, one time).
-2. Download `Concierge-GoogleWorkspace-<version>-darwin-<arch>.mcpb` from the Releases page (or build locally: `packages/google-workspace/build/pack.sh`).
+Two install guides, same install — pick whichever matches how you like to work:
+
+- **Quickstart** (terminal recipe, commands only, ~10 min): [docs/setup/quickstart.md](docs/setup/quickstart.md)
+- **Full onboarding** (prose + troubleshooting, ~15 min): [docs/setup/user-onboarding.md](docs/setup/user-onboarding.md)
+
+At a glance:
+
+1. Complete the one-time Google Cloud setup (OAuth client + enable APIs + `gws auth login`).
+2. Obtain `Concierge-GoogleWorkspace-<version>-darwin-<arch>.mcpb` — from the Releases page, built locally (`packages/google-workspace/build/pack.sh`), or directly from Justin for v1 early users (repo is currently private).
 3. Open the `.mcpb` with Claude Desktop.
 4. Use it: ask Claude to send an email, upload a file, create a form, etc.
-5. Run `concierge_info` at any time to confirm which version you have installed.
+5. Run `concierge_info` at any time to confirm which build (version + `build_time`) you have installed.
 
 ## Status
 
