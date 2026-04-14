@@ -73,3 +73,21 @@ v1 primary user: startup CEO (PashionFootwear). Gmail + Sheets + Forms are the h
 - gws is **effectively single-account** in v0.22.5. Our multi-account design is aspirational — light it up when upstream supports it.
 - Real command paths differ from intuition: `forms responses list` is actually `forms forms responses list` (4 segments). `admin-reports usageReports get` is `admin-reports userUsageReport get`.
 - `project_id` in `~/.config/gws/client_secret.json` must match the real Cloud Project ID **string** (e.g. `desktop-app-493302`), not the numeric project number prefix of the client_id, and definitely not a placeholder. Symptom when wrong: `"Project 'projects/<x>' not found or deleted"` — not an Anthropic infra issue.
+
+## Stale `.mcpb` install detection + recovery
+
+- Claude Desktop doesn't always replace a `.mcpb` when you reopen the file. The old unpacked extension can remain at `~/Library/Application Support/Claude/Claude Extensions/local.mcpb.<author>.<name>/`.
+- Symptom: tools that use strict output schemas (like `concierge_info`, `list_accounts`) return "Tool execution failed" while permissive-schema tools (like `gmail_triage`) keep working. Every install-level bug fix also looks latent because the fix is in the new build but Claude Desktop is running the old one.
+- Fast diagnostic: `concierge_info` returns `build_time` + `build_id` baked at build time via tsup define. If those don't match what your latest `./build/pack.sh` printed, Claude Desktop is running a stale copy.
+- Fallback diagnostic: `shasum -a 256 <unpacked-extension>/dist/index.js` vs `shasum -a 256 packages/google-workspace/dist/index.js`. Mismatch ⇒ stale install.
+- Hard-reinstall sequence (when `open -a Claude <.mcpb>` doesn't take):
+  ```bash
+  osascript -e 'quit app "Claude"'
+  rm -rf "$HOME/Library/Application Support/Claude/Claude Extensions/local.mcpb.justin-stottlemyer.concierge-google-workspace"
+  open -a Claude
+  open -a Claude /path/to/Concierge-GoogleWorkspace-<version>-darwin-arm64.mcpb
+  ```
+
+## Docs are dual-format
+
+- Every end-user setup flow ships in two docs: a prose version (`docs/setup/user-onboarding.md`) with context + troubleshooting, and a terminal recipe (`docs/setup/quickstart.md`) with minimal prose. Keep both in sync when changing setup steps.
