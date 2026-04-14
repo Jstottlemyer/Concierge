@@ -1,0 +1,14 @@
+Reads and writes Google Docs documents.
+
+Usage: gws [OPTIONS] <COMMAND>
+
+Commands:
+  +write     [Helper] Append text to a document
+  documents  Operations on the 'documents' resource
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --sanitize <TEMPLATE>  Sanitize API responses through a Model Armor template. Requires cloud-platform scope. Format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE. Also reads GWS_SANITIZE_TEMPLATE env var.
+      --dry-run              Validate the request locally without sending it to the API
+      --format <FORMAT>      Output format: json (default), table, yaml, csv
+  -h, --help                 Print help

@@ -1,0 +1,25 @@
+{
+  "spaces": [
+    {
+      "name": "spaces/AAAA-FAKE-SPACE-1",
+      "type": "ROOM",
+      "spaceType": "SPACE",
+      "spaceThreadingState": "THREADED_MESSAGES",
+      "displayName": "Engineering",
+      "spaceHistoryState": "HISTORY_ON",
+      "createTime": "2025-09-12T15:03:22.000Z",
+      "membershipCount": {
+        "joinedDirectHumanUserCount": 12,
+        "joinedGroupCount": 0
+      }
+    },
+    {
+      "name": "spaces/BBBB-FAKE-SPACE-2",
+      "type": "DM",
+      "spaceType": "DIRECT_MESSAGE",
+      "singleUserBotDm": false,
+      "createTime": "2026-02-03T09:41:10.000Z"
+    }
+  ],
+  "nextPageToken": ""
+}

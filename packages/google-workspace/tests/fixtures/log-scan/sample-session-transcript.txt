@@ -1,0 +1,114 @@
+===== BEGIN AUTHTOOLS MCP SAMPLE SESSION TRANSCRIPT =====
+
+# Purpose
+# -------
+# Representative transcript of MCP stdout/stderr emitted during a full
+# Claude Desktop session exercising authtools/google-workspace-mcp.
+# Mixes:
+#   - initialization messages
+#   - successful tool results (drive_files_list, docs_documents_get)
+#   - structured error envelopes (consent_denied, expired_refresh_fail,
+#     network_error, keychain_locked)
+#   - progress notifications
+#   - warning lines
+#   - raw stderr from the child gws subprocess
+#
+# KNOWN-FAKE tokens from tests/fixtures/log-scan/positive-tokens.txt are
+# embedded on purpose so the T28 log-scan gate has something to redact.
+# A correct redactor MUST scrub every token below before emitting.
+#
+# DO NOT paste a REAL token into this file. All tokens here are fake.
+#
+# Spec refs: google-workspace-mcp spec.md AC §20, plan.md Decision #8.
+
+[2026-04-13T12:00:00.010Z] INFO  authtools mcp server starting (pid=42311)
+[2026-04-13T12:00:00.121Z] INFO  resolved gws binary: /Users/demo/Library/Application Support/Claude/Extensions/authtools/bin/gws
+[2026-04-13T12:00:00.133Z] INFO  gws --version -> gws 0.22.5
+[2026-04-13T12:00:00.214Z] INFO  state loaded from ~/.config/gws/authtools-state.json (v1)
+
+# ------------------------------------------------------------------
+# Client initialize handshake — no tokens expected, but the redactor
+# must not mangle the protocol fields.
+# ------------------------------------------------------------------
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"authtools-gws","version":"0.0.1"}}}
+
+# ------------------------------------------------------------------
+# Progress notification — the dispatcher emits these while waiting on
+# a slow gws subprocess. Shape taken from MCP SDK.
+# ------------------------------------------------------------------
+{"jsonrpc":"2.0","method":"notifications/progress","params":{"progressToken":"drive_list_1","progress":1,"total":3,"message":"invoking gws drive files list"}}
+{"jsonrpc":"2.0","method":"notifications/progress","params":{"progressToken":"drive_list_1","progress":2,"total":3,"message":"parsing json"}}
+{"jsonrpc":"2.0","method":"notifications/progress","params":{"progressToken":"drive_list_1","progress":3,"total":3,"message":"done"}}
+
+# ------------------------------------------------------------------
+# Successful tool result — drive_files_list
+# ------------------------------------------------------------------
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"{\"items\":[{\"id\":\"1FAKE_FILE_ID_ABCDEFGHIJKLMNOPQRSTUV\",\"name\":\"Quarterly Review.docx\",\"mimeType\":\"application/vnd.google-apps.document\"}],\"next_page_token\":\"\",\"has_more\":false}"}]}}
+
+# ------------------------------------------------------------------
+# Successful tool result — docs_documents_get. Note the document body
+# contains what looks-but-is-not-really like a token; the redactor must
+# leave alphanumeric identifiers alone unless they match a specific
+# committed token shape.
+# ------------------------------------------------------------------
+{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"{\"title\":\"Kickoff Notes\",\"documentId\":\"1ABC_NOT_A_TOKEN_definitelydocidentifier\",\"revisionId\":\"ALm37BXyz\"}"}]}}
+
+# ------------------------------------------------------------------
+# Error envelope — consent_denied. The dispatcher surfaces it as a
+# structured result.error plus a brief stderr line from gws itself.
+# ------------------------------------------------------------------
+[2026-04-13T12:00:12.551Z] WARN  gws stderr: OAuth consent denied by user
+{"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"{\"ok\":false,\"error\":{\"error_code\":\"consent_denied\",\"message\":\"User denied consent in browser; re-run auth flow.\",\"gws_exit_code\":10,\"gws_version\":\"gws 0.22.5\"}}"}]}}
+
+# ------------------------------------------------------------------
+# Error envelope — expired_refresh_fail. The gws stderr carried a
+# `refresh_token=` kv pair in its internal error path. The redactor
+# MUST scrub the refresh_token value even though it's in a
+# transcript line (defense in depth — gws is supposed to redact
+# first, but we do not trust that path).
+# ------------------------------------------------------------------
+[2026-04-13T12:00:33.119Z] WARN  gws stderr: token refresh failed (invalid_grant) while exchanging refresh_token=1//FAKE_REFRESH_TOKEN for access
+{"jsonrpc":"2.0","id":5,"result":{"content":[{"type":"text","text":"{\"ok\":false,\"error\":{\"error_code\":\"expired_refresh_fail\",\"message\":\"Refresh token rejected; user must re-authenticate.\",\"gws_exit_code\":11,\"gws_version\":\"gws 0.22.5\"}}"}]}}
+
+# ------------------------------------------------------------------
+# Error envelope — network_error. Partial debug line includes an
+# Authorization header leak from a mock upstream response. This is
+# exactly the shape the redactor exists to catch.
+# ------------------------------------------------------------------
+[2026-04-13T12:01:05.402Z] WARN  gws stderr: HTTP 429 from https://www.googleapis.com/drive/v3/files (Retry-After: 30s); upstream set access_token="ya29.FAKE_ACCESS_TOKEN"
+{"jsonrpc":"2.0","id":6,"result":{"content":[{"type":"text","text":"{\"ok\":false,\"error\":{\"error_code\":\"network_error\",\"message\":\"Upstream rate-limited the request.\",\"retry_after_ms\":30000,\"gws_exit_code\":15,\"gws_version\":\"gws 0.22.5\"}}"}]}}
+
+# ------------------------------------------------------------------
+# Error envelope — keychain_locked. No token material in the message,
+# but includes a fake JWT because the auth server emitted one during
+# the failed unlock attempt (and we want to assert it's scrubbed).
+# ------------------------------------------------------------------
+[2026-04-13T12:02:10.902Z] WARN  gws stderr: keychain locked; cached id_token eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3Qta2V5In0.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJzdWIiOiJ0ZXN0In0.FAKE_SIGNATURE_FOR_TESTING not usable for refresh
+{"jsonrpc":"2.0","id":7,"result":{"content":[{"type":"text","text":"{\"ok\":false,\"error\":{\"error_code\":\"keychain_locked\",\"message\":\"macOS keychain is locked; unlock and retry.\",\"gws_exit_code\":13,\"gws_version\":\"gws 0.22.5\"}}"}]}}
+
+# ------------------------------------------------------------------
+# Debug trace — a request to factory_reset surfaced a client_secret
+# in a legacy gws log path (pre-0.22.3). The redactor is the last
+# line of defense here.
+# ------------------------------------------------------------------
+[2026-04-13T12:03:40.772Z] DEBUG gws trace: oauth client_secret=GOCSPX-FAKE_CLIENT_SECRET_FOR_TESTING used for device-flow exchange
+[2026-04-13T12:03:40.790Z] DEBUG gws trace: legacy env GOCSPX-FAKE_CLIENT_SECRET_FOR_TESTING printed for backward-compat; sweep-reader warn
+
+# ------------------------------------------------------------------
+# A raw ya29 prefix embedded in prose (the kind of thing a well-meaning
+# error message might quote verbatim). Must be redacted.
+# ------------------------------------------------------------------
+[2026-04-13T12:04:00.001Z] DEBUG bearer token seen: ya29.FAKE_TOKEN_FOR_TESTING_ONLY_ABCDEFGHIJK (length=43)
+
+# ------------------------------------------------------------------
+# Extra multi-token line — both prefixes in the same string.
+# ------------------------------------------------------------------
+[2026-04-13T12:04:05.500Z] DEBUG cross-referenced access_token="ya29.FAKE_ACCESS_TOKEN" against refresh_token=1//FAKE_REFRESH_TOKEN
+
+# ------------------------------------------------------------------
+# Server shutdown.
+# ------------------------------------------------------------------
+[2026-04-13T12:05:00.000Z] INFO  received SIGINT; flushing state
+[2026-04-13T12:05:00.112Z] INFO  authtools mcp server shut down cleanly (pid=42311, uptime=300.1s)
+
+===== END AUTHTOOLS MCP SAMPLE SESSION TRANSCRIPT =====

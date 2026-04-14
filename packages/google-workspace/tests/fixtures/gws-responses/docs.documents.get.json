@@ -1,0 +1,46 @@
+{
+  "documentId": "1FAKE_DOC_ID_ABCDEFGHIJKLMNOPQRSTUV",
+  "title": "Sample Doc",
+  "revisionId": "ALm37BW-FAKE-REVISION-ID",
+  "body": {
+    "content": [
+      {
+        "endIndex": 1,
+        "sectionBreak": {
+          "sectionStyle": {
+            "columnSeparatorStyle": "NONE",
+            "contentDirection": "LEFT_TO_RIGHT"
+          }
+        }
+      },
+      {
+        "startIndex": 1,
+        "endIndex": 22,
+        "paragraph": {
+          "elements": [
+            {
+              "startIndex": 1,
+              "endIndex": 22,
+              "textRun": {
+                "content": "Hello from AuthTools.\n",
+                "textStyle": {}
+              }
+            }
+          ],
+          "paragraphStyle": {
+            "namedStyleType": "NORMAL_TEXT",
+            "direction": "LEFT_TO_RIGHT"
+          }
+        }
+      }
+    ]
+  },
+  "documentStyle": {
+    "background": { "color": {} },
+    "pageSize": {
+      "height": { "magnitude": 792, "unit": "PT" },
+      "width":  { "magnitude": 612, "unit": "PT" }
+    }
+  },
+  "suggestionsViewMode": "SUGGESTIONS_INLINE"
+}

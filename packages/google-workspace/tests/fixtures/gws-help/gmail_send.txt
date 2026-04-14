@@ -1,0 +1,34 @@
+[Helper] Send an email
+
+Usage: gws +send [OPTIONS] --to <EMAILS> --subject <SUBJECT> --body <TEXT>
+
+Options:
+      --sanitize <TEMPLATE>  Sanitize API responses through a Model Armor template. Requires cloud-platform scope. Format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE. Also reads GWS_SANITIZE_TEMPLATE env var.
+      --to <EMAILS>          Recipient email address(es), comma-separated
+      --subject <SUBJECT>    Email subject
+      --body <TEXT>          Email body (plain text, or HTML with --html)
+      --format <FORMAT>      Output format: json (default), table, yaml, csv
+      --from <EMAIL>         Sender address (for send-as/alias; omit to use account default)
+  -a, --attach <PATH>        Attach a file (can be specified multiple times)
+      --cc <EMAILS>          CC email address(es), comma-separated
+      --bcc <EMAILS>         BCC email address(es), comma-separated
+      --html                 Treat --body as HTML content (default is plain text)
+      --dry-run              Show the request that would be sent without executing it
+      --draft                Save as draft instead of sending
+  -h, --help                 Print help
+
+EXAMPLES:
+  gws gmail +send --to alice@example.com --subject 'Hello' --body 'Hi Alice!'
+  gws gmail +send --to alice@example.com --subject 'Hello' --body 'Hi!' --cc bob@example.com
+  gws gmail +send --to alice@example.com --subject 'Hello' --body '<b>Bold</b> text' --html
+  gws gmail +send --to alice@example.com --subject 'Hello' --body 'Hi!' --from alias@example.com
+  gws gmail +send --to alice@example.com --subject 'Report' --body 'See attached' -a report.pdf
+  gws gmail +send --to alice@example.com --subject 'Files' --body 'Two files' -a a.pdf -a b.csv
+  gws gmail +send --to alice@example.com --subject 'Hello' --body 'Hi!' --draft
+
+TIPS:
+  Handles RFC 5322 formatting, MIME encoding, and base64 automatically.
+  Use --from to send from a configured send-as alias instead of your primary address.
+  Use -a/--attach to add file attachments. Can be specified multiple times. Total size limit: 25MB.
+  With --html, use fragment tags (<p>, <b>, <a>, <br>, etc.) — no <html>/<body> wrapper needed.
+  Use --draft to save the message as a draft instead of sending it immediately.

@@ -1,0 +1,36 @@
+[Helper] Reply to a message (handles threading automatically)
+
+Usage: gws +reply [OPTIONS] --message-id <ID> --body <TEXT>
+
+Options:
+      --message-id <ID>      Gmail message ID to reply to
+      --sanitize <TEMPLATE>  Sanitize API responses through a Model Armor template. Requires cloud-platform scope. Format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE. Also reads GWS_SANITIZE_TEMPLATE env var.
+      --body <TEXT>          Reply body (plain text, or HTML with --html)
+      --format <FORMAT>      Output format: json (default), table, yaml, csv
+      --from <EMAIL>         Sender address (for send-as/alias; omit to use account default)
+      --to <EMAILS>          Additional To email address(es), comma-separated
+  -a, --attach <PATH>        Attach a file (can be specified multiple times)
+      --cc <EMAILS>          CC email address(es), comma-separated
+      --bcc <EMAILS>         BCC email address(es), comma-separated
+      --html                 Treat --body as HTML content (default is plain text)
+      --dry-run              Show the request that would be sent without executing it
+      --draft                Save as draft instead of sending
+  -h, --help                 Print help
+
+EXAMPLES:
+  gws gmail +reply --message-id 18f1a2b3c4d --body 'Thanks, got it!'
+  gws gmail +reply --message-id 18f1a2b3c4d --body 'Looping in Carol' --cc carol@example.com
+  gws gmail +reply --message-id 18f1a2b3c4d --body 'Adding Dave' --to dave@example.com
+  gws gmail +reply --message-id 18f1a2b3c4d --body '<b>Bold reply</b>' --html
+  gws gmail +reply --message-id 18f1a2b3c4d --body 'Updated version' -a updated.docx
+  gws gmail +reply --message-id 18f1a2b3c4d --body 'Draft reply' --draft
+
+TIPS:
+  Automatically sets In-Reply-To, References, and threadId headers.
+  Quotes the original message in the reply body.
+  --to adds extra recipients to the To field.
+  Use -a/--attach to add file attachments. Can be specified multiple times.
+  With --html, the quoted block uses Gmail's gmail_quote CSS classes and preserves HTML formatting. Use fragment tags (<p>, <b>, <a>, etc.) — no <html>/<body> wrapper needed.
+  With --html, inline images in the quoted message are preserved via cid: references.
+  Use --draft to save the reply as a draft instead of sending it immediately.
+  For reply-all, use +reply-all instead.

@@ -1,0 +1,19 @@
+{
+  "kind": "drive#fileList",
+  "incompleteSearch": false,
+  "nextPageToken": "~!!~AI9FV7QFAKEPAGETOKEN",
+  "files": [
+    {
+      "kind": "drive#file",
+      "id": "1FAKE_FILE_ID_ABCDEFGHIJKLMNOPQRSTUV",
+      "name": "Sample Document.docx",
+      "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    {
+      "kind": "drive#file",
+      "id": "1FAKE_FILE_ID_ZYXWVUTSRQPONMLKJIHGFE",
+      "name": "Q2 Plan",
+      "mimeType": "application/vnd.google-apps.document"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "spaces/FAKEMEETSPACEABCDE",
+  "meetingUri": "https://meet.google.com/fak-euri-zzz",
+  "meetingCode": "fak-euri-zzz",
+  "config": {
+    "accessType": "TRUSTED",
+    "entryPointAccess": "ALL"
+  },
+  "activeConference": null
+}

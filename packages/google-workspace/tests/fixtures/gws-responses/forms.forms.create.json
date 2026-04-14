@@ -1,0 +1,15 @@
+{
+  "formId": "1FAKE_FORM_ID_ABCDEFGHIJKLMNOPQRSTUV",
+  "info": {
+    "title": "AuthTools Feedback",
+    "documentTitle": "AuthTools Feedback"
+  },
+  "settings": {
+    "quizSettings": {
+      "isQuiz": false
+    }
+  },
+  "revisionId": "00000001",
+  "responderUri": "https://docs.google.com/forms/d/e/1FAKE_PUBLISHED_ID/viewform",
+  "linkedSheetId": null
+}

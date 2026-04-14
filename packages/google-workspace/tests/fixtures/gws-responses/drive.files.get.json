@@ -1,0 +1,28 @@
+{
+  "kind": "drive#file",
+  "id": "1FAKE_FILE_ID_ABCDEFGHIJKLMNOPQRSTUV",
+  "name": "Sample Document.docx",
+  "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "description": "Sample fixture file for shim tests.",
+  "starred": false,
+  "trashed": false,
+  "parents": ["0AFAKEFOLDERID"],
+  "createdTime": "2026-01-15T10:30:00.000Z",
+  "modifiedTime": "2026-04-10T14:22:18.000Z",
+  "size": "48213",
+  "md5Checksum": "d41d8cd98f00b204e9800998ecf8427e",
+  "owners": [
+    {
+      "kind": "drive#user",
+      "displayName": "Test User",
+      "emailAddress": "test@example.com",
+      "me": true
+    }
+  ],
+  "capabilities": {
+    "canEdit": true,
+    "canShare": true,
+    "canDownload": true
+  },
+  "webViewLink": "https://docs.google.com/document/d/1FAKE_FILE_ID_ABCDEFGHIJKLMNOPQRSTUV/edit"
+}

@@ -1,0 +1,18 @@
+[Helper] Append text to a document
+
+Usage: gws +write [OPTIONS] --document <ID> --text <TEXT>
+
+Options:
+      --document <ID>        Document ID
+      --sanitize <TEMPLATE>  Sanitize API responses through a Model Armor template. Requires cloud-platform scope. Format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE. Also reads GWS_SANITIZE_TEMPLATE env var.
+      --dry-run              Validate the request locally without sending it to the API
+      --text <TEXT>          Text to append (plain text)
+      --format <FORMAT>      Output format: json (default), table, yaml, csv
+  -h, --help                 Print help
+
+EXAMPLES:
+  gws docs +write --document DOC_ID --text 'Hello, world!'
+
+TIPS:
+  Text is inserted at the end of the document body.
+  For rich formatting, use the raw batchUpdate API instead.

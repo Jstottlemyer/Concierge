@@ -1,0 +1,58 @@
+{
+  "name": "@concierge/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Concierge core — foundation library for vendor packages under @concierge/*.",
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./errors": {
+      "types": "./src/errors/index.ts",
+      "default": "./src/errors/index.ts"
+    },
+    "./log": {
+      "types": "./src/log/index.ts",
+      "default": "./src/log/index.ts"
+    },
+    "./state": {
+      "types": "./src/state/index.ts",
+      "default": "./src/state/index.ts"
+    },
+    "./confirmation": {
+      "types": "./src/confirmation/index.ts",
+      "default": "./src/confirmation/index.ts"
+    },
+    "./tools": {
+      "types": "./src/tools/index.ts",
+      "default": "./src/tools/index.ts"
+    },
+    "./mcp": {
+      "types": "./src/mcp/index.ts",
+      "default": "./src/mcp/index.ts"
+    },
+    "./vendor-cli": {
+      "types": "./src/vendor-cli/index.ts",
+      "default": "./src/vendor-cli/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "lint": "eslint src tests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest",
+    "zod": "latest",
+    "zod-to-json-schema": "latest"
+  }
+}

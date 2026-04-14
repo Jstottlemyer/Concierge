@@ -1,0 +1,312 @@
+# Release packaging — builds per-arch `.mcpb` bundles on tag push.
+#
+# Fires only on vendor-specific tags `google-workspace-vX.Y.Z` (preferred) or
+# legacy `vX.Y.Z` tags (backwards compat with the pre-monorepo convention).
+# The hybrid matrix lives here (not in ci.yml) because `.mcpb` assembly needs
+# the actual darwin `gws` binary bundled in.
+#
+# Ordering:
+#   1. Re-run the full ubuntu CI suite (lint / typecheck / test / build)
+#      as a prerequisite — no release without a green build.
+#   2. Two macOS packaging jobs in parallel (arm64 on macos-14, x64 on
+#      macos-13). Each fetches + sha256-verifies the pinned gws binary,
+#      stages it alongside dist/, and zips to a `.mcpb` release asset.
+#
+# Spec refs:
+#   - docs/vendors/google-workspace/spec.md §Distribution AC §29–31
+#   - docs/vendors/google-workspace/plan.md Decision #11 (binary integrity)
+#   - docs/vendors/google-workspace/plan.md T19, T34 (release engineering)
+name: package-mcpb
+
+on:
+  push:
+    tags:
+      - 'google-workspace-v*.*.*'
+      - 'v*.*.*'  # legacy tag format
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag or ref to package'
+        required: true
+        default: 'main'
+
+permissions:
+  contents: write  # release upload
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PKG_DIR: packages/google-workspace
+
+jobs:
+  # Prereq: full ubuntu CI must pass before we burn macOS minutes.
+  lint-test-build:
+    name: lint + typecheck + test + build (prereq)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm -r lint
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Test
+        run: pnpm -r test
+
+      - name: Build
+        run: pnpm --filter @concierge/google-workspace build
+
+  package-darwin-arm64:
+    name: package darwin-arm64 (.mcpb)
+    needs: lint-test-build
+    runs-on: macos-14  # Apple Silicon
+    timeout-minutes: 20
+    env:
+      ARCH: darwin-arm64
+      # Mirrors build/pack.sh asset naming: aarch64 for arm64 macs.
+      ASSET: google-workspace-cli-aarch64-apple-darwin.tar.gz
+      PKG_DIR: packages/google-workspace
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build TypeScript
+        run: pnpm --filter @concierge/google-workspace build
+
+      - name: Resolve pinned gws version + sha256
+        id: pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          line="$(grep -E "^[0-9a-f]{64}[[:space:]]+${ARCH}[[:space:]]+v" ${PKG_DIR}/build/gws-checksums.txt | head -n1)"
+          if [[ -z "$line" ]]; then
+            echo "::error::no pinned sha for ${ARCH} in ${PKG_DIR}/build/gws-checksums.txt"
+            exit 1
+          fi
+          sha="$(echo "$line" | awk '{print $1}')"
+          version="$(echo "$line" | awk '{print $3}')"
+          echo "sha=$sha"         >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Download + verify gws binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ${PKG_DIR}/bin
+          url="https://github.com/googleworkspace/cli/releases/download/${{ steps.pin.outputs.version }}/${ASSET}"
+          echo "downloading $url"
+          curl -fsSL -o "${ASSET}" "$url"
+          tar -xzf "${ASSET}"
+          bin_path="$(find . -maxdepth 3 -type f -name gws | head -n1)"
+          if [[ -z "$bin_path" ]]; then
+            echo "::error::could not find gws in extracted tarball"
+            exit 1
+          fi
+          actual="$(shasum -a 256 "$bin_path" | awk '{print $1}')"
+          expected="${{ steps.pin.outputs.sha }}"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::sha256 mismatch: expected=$expected actual=$actual"
+            exit 1
+          fi
+          mv "$bin_path" ${PKG_DIR}/bin/gws
+          chmod +x ${PKG_DIR}/bin/gws
+          echo "gws verified and staged at ${PKG_DIR}/bin/gws"
+
+      - name: Assemble .mcpb staging directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_NAME="${GITHUB_REF_NAME}"
+          # Accept both 'google-workspace-v1.2.3' and 'v1.2.3' tag forms.
+          if [[ "$TAG_NAME" == google-workspace-v* ]]; then
+            VERSION="${TAG_NAME#google-workspace-v}"
+          elif [[ "$TAG_NAME" == v* ]]; then
+            VERSION="${TAG_NAME#v}"
+          else
+            # workflow_dispatch path — fall back to manifest version.
+            VERSION="$(node -e "console.log(JSON.parse(require('fs').readFileSync('${PKG_DIR}/manifest.json','utf8')).version)")"
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+          stage="${PKG_DIR}/.mcpb-staging"
+          rm -rf "$stage"
+          mkdir -p "$stage/bin"
+          cp ${PKG_DIR}/manifest.json "$stage/"
+          cp -R ${PKG_DIR}/dist "$stage/dist"
+          cp ${PKG_DIR}/bin/gws "$stage/bin/gws"
+          [[ -f ${PKG_DIR}/LICENSE ]]     && cp ${PKG_DIR}/LICENSE     "$stage/"  || true
+          [[ -f ${PKG_DIR}/LICENSE.gws ]] && cp ${PKG_DIR}/LICENSE.gws "$stage/"  || true
+          [[ -f ${PKG_DIR}/NOTICE.gws ]]  && cp ${PKG_DIR}/NOTICE.gws  "$stage/"  || true
+
+      - name: Zip to .mcpb
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="Concierge-GoogleWorkspace-${VERSION}-${ARCH}.mcpb"
+          (cd ${PKG_DIR}/.mcpb-staging && zip -qr "${GITHUB_WORKSPACE}/${OUT}" .)
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+          echo "produced: ${OUT}"
+
+      - name: Upload as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.OUT }}
+          path: ${{ env.OUT }}
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.OUT }}
+          draft: true
+
+  package-darwin-x64:
+    name: package darwin-x64 (.mcpb)
+    needs: lint-test-build
+    runs-on: macos-13  # Intel
+    timeout-minutes: 20
+    env:
+      ARCH: darwin-x64
+      # Mirrors build/pack.sh asset naming: x86_64 for Intel macs.
+      ASSET: google-workspace-cli-x86_64-apple-darwin.tar.gz
+      PKG_DIR: packages/google-workspace
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build TypeScript
+        run: pnpm --filter @concierge/google-workspace build
+
+      - name: Resolve pinned gws version + sha256
+        id: pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          line="$(grep -E "^[0-9a-f]{64}[[:space:]]+${ARCH}[[:space:]]+v" ${PKG_DIR}/build/gws-checksums.txt | head -n1)"
+          if [[ -z "$line" ]]; then
+            echo "::error::no pinned sha for ${ARCH} in ${PKG_DIR}/build/gws-checksums.txt"
+            exit 1
+          fi
+          sha="$(echo "$line" | awk '{print $1}')"
+          version="$(echo "$line" | awk '{print $3}')"
+          echo "sha=$sha"         >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Download + verify gws binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ${PKG_DIR}/bin
+          url="https://github.com/googleworkspace/cli/releases/download/${{ steps.pin.outputs.version }}/${ASSET}"
+          echo "downloading $url"
+          curl -fsSL -o "${ASSET}" "$url"
+          tar -xzf "${ASSET}"
+          bin_path="$(find . -maxdepth 3 -type f -name gws | head -n1)"
+          if [[ -z "$bin_path" ]]; then
+            echo "::error::could not find gws in extracted tarball"
+            exit 1
+          fi
+          actual="$(shasum -a 256 "$bin_path" | awk '{print $1}')"
+          expected="${{ steps.pin.outputs.sha }}"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::sha256 mismatch: expected=$expected actual=$actual"
+            exit 1
+          fi
+          mv "$bin_path" ${PKG_DIR}/bin/gws
+          chmod +x ${PKG_DIR}/bin/gws
+
+      - name: Assemble .mcpb staging directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_NAME="${GITHUB_REF_NAME}"
+          if [[ "$TAG_NAME" == google-workspace-v* ]]; then
+            VERSION="${TAG_NAME#google-workspace-v}"
+          elif [[ "$TAG_NAME" == v* ]]; then
+            VERSION="${TAG_NAME#v}"
+          else
+            VERSION="$(node -e "console.log(JSON.parse(require('fs').readFileSync('${PKG_DIR}/manifest.json','utf8')).version)")"
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+          stage="${PKG_DIR}/.mcpb-staging"
+          rm -rf "$stage"
+          mkdir -p "$stage/bin"
+          cp ${PKG_DIR}/manifest.json "$stage/"
+          cp -R ${PKG_DIR}/dist "$stage/dist"
+          cp ${PKG_DIR}/bin/gws "$stage/bin/gws"
+          [[ -f ${PKG_DIR}/LICENSE ]]     && cp ${PKG_DIR}/LICENSE     "$stage/"  || true
+          [[ -f ${PKG_DIR}/LICENSE.gws ]] && cp ${PKG_DIR}/LICENSE.gws "$stage/"  || true
+          [[ -f ${PKG_DIR}/NOTICE.gws ]]  && cp ${PKG_DIR}/NOTICE.gws  "$stage/"  || true
+
+      - name: Zip to .mcpb
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="Concierge-GoogleWorkspace-${VERSION}-${ARCH}.mcpb"
+          (cd ${PKG_DIR}/.mcpb-staging && zip -qr "${GITHUB_WORKSPACE}/${OUT}" .)
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+          echo "produced: ${OUT}"
+
+      - name: Upload as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.OUT }}
+          path: ${{ env.OUT }}
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.OUT }}
+          draft: true

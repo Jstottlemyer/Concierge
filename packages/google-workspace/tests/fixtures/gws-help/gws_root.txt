@@ -1,0 +1,73 @@
+gws — Google Workspace CLI
+
+USAGE:
+    gws <service> <resource> [sub-resource] <method> [flags]
+    gws schema <service.resource.method> [--resolve-refs]
+
+EXAMPLES:
+    gws drive files list --params '{"pageSize": 10}'
+    gws drive files get --params '{"fileId": "abc123"}'
+    gws sheets spreadsheets get --params '{"spreadsheetId": "..."}'
+    gws gmail users messages list --params '{"userId": "me"}'
+    gws schema drive.files.list
+
+FLAGS:
+    --params <JSON>       URL/Query parameters as JSON
+    --json <JSON>         Request body as JSON (POST/PATCH/PUT)
+    --upload <PATH>       Local file to upload as media content (multipart)
+    --upload-content-type <MIME>  MIME type of the uploaded file (auto-detected from extension if omitted)
+    --output <PATH>       Output file path for binary responses
+    --format <FMT>        Output format: json (default), table, yaml, csv
+    --api-version <VER>   Override the API version (e.g., v2, v3)
+    --page-all            Auto-paginate, one JSON line per page (NDJSON)
+    --page-limit <N>      Max pages to fetch with --page-all (default: 10)
+    --page-delay <MS>     Delay between pages in ms (default: 100)
+
+SERVICES:
+    drive                Manage files, folders, and shared drives
+    sheets               Read and write spreadsheets
+    gmail                Send, read, and manage email
+    calendar             Manage calendars and events
+    admin-reports        Audit logs and usage reports (also: reports)
+    docs                 Read and write Google Docs
+    slides               Read and write presentations
+    tasks                Manage task lists and tasks
+    people               Manage contacts and profiles
+    chat                 Manage Chat spaces and messages
+    classroom            Manage classes, rosters, and coursework
+    forms                Read and write Google Forms
+    keep                 Manage Google Keep notes
+    meet                 Manage Google Meet conferences
+    events               Subscribe to Google Workspace events
+    modelarmor           Filter user-generated content for safety
+    workflow             Cross-service productivity workflows (also: wf)
+    script               Manage Google Apps Script projects
+
+ENVIRONMENT:
+    GOOGLE_WORKSPACE_CLI_TOKEN               Pre-obtained OAuth2 access token (highest priority)
+    GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE    Path to OAuth credentials JSON file
+    GOOGLE_WORKSPACE_CLI_CLIENT_ID           OAuth client ID (for gws auth login)
+    GOOGLE_WORKSPACE_CLI_CLIENT_SECRET       OAuth client secret (for gws auth login)
+    GOOGLE_WORKSPACE_CLI_CONFIG_DIR          Override config directory (default: ~/.config/gws)
+    GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND     Keyring backend: keyring (default) or file
+    GOOGLE_WORKSPACE_CLI_SANITIZE_TEMPLATE   Default Model Armor template
+    GOOGLE_WORKSPACE_CLI_SANITIZE_MODE       Sanitization mode: warn (default) or block
+    GOOGLE_WORKSPACE_PROJECT_ID              Override the GCP project ID for quota and billing
+    GOOGLE_WORKSPACE_CLI_LOG                 Log level for stderr (e.g., gws=debug)
+    GOOGLE_WORKSPACE_CLI_LOG_FILE            Directory for JSON log files (daily rotation)
+
+EXIT CODES:
+    0    Success
+    1    API error  — Google returned an error response
+    2    Auth error — credentials missing or invalid
+    3    Validation — bad arguments or input
+    4    Discovery  — could not fetch API schema
+    5    Internal   — unexpected failure
+
+COMMUNITY:
+    Star the repo: https://github.com/googleworkspace/cli
+    Report bugs / request features: https://github.com/googleworkspace/cli/issues
+    Please search existing issues first; if one already exists, comment there.
+
+DISCLAIMER:
+    This is not an officially supported Google product.

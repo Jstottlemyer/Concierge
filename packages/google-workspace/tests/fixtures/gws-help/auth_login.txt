@@ -1,0 +1,10 @@
+Authenticate via OAuth2 (opens browser)
+
+Usage: auth login [OPTIONS]
+
+Options:
+      --readonly             Request read-only scopes
+      --full                 Request all scopes incl. pubsub + cloud-platform
+      --scopes <scopes>      Comma-separated custom scopes
+  -s, --services <services>  Comma-separated service names to limit scope picker (e.g. drive,gmail,sheets)
+  -h, --help                 Print help

@@ -1,0 +1,25 @@
+{
+  "name": "@concierge/google-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Concierge vendor package for Google Workspace — .mcpb MCP server wrapping googleworkspace/cli.",
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src tests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@concierge/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "latest",
+    "zod": "latest",
+    "zod-to-json-schema": "latest"
+  }
+}

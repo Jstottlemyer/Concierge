@@ -1,0 +1,10 @@
+{
+  "kind": "drive#permission",
+  "id": "08FAKEPERMISSIONID",
+  "type": "user",
+  "role": "writer",
+  "emailAddress": "collaborator@example.com",
+  "displayName": "Collaborator",
+  "deleted": false,
+  "pendingOwner": false
+}

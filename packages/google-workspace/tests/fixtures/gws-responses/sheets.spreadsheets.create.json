@@ -1,0 +1,30 @@
+{
+  "spreadsheetId": "1FAKE_SHEET_ID_ABCDEFGHIJKLMNOPQRSTUV",
+  "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1FAKE_SHEET_ID_ABCDEFGHIJKLMNOPQRSTUV/edit",
+  "properties": {
+    "title": "AuthTools Scratch Sheet",
+    "locale": "en_US",
+    "autoRecalc": "ON_CHANGE",
+    "timeZone": "America/Los_Angeles",
+    "defaultFormat": {
+      "backgroundColor": { "red": 1, "green": 1, "blue": 1 },
+      "padding": { "top": 2, "right": 3, "bottom": 2, "left": 3 },
+      "verticalAlignment": "BOTTOM",
+      "wrapStrategy": "OVERFLOW_CELL"
+    }
+  },
+  "sheets": [
+    {
+      "properties": {
+        "sheetId": 0,
+        "title": "Sheet1",
+        "index": 0,
+        "sheetType": "GRID",
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26
+        }
+      }
+    }
+  ]
+}

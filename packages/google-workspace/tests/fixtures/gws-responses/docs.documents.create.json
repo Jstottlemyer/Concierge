@@ -1,0 +1,22 @@
+{
+  "documentId": "1FAKE_NEW_DOC_ID_ABCDEFGHIJKLMNOPQRST",
+  "title": "New AuthTools Doc",
+  "revisionId": "ALm37BW-FAKE-INITIAL-REVISION",
+  "body": {
+    "content": [
+      {
+        "endIndex": 1,
+        "sectionBreak": {
+          "sectionStyle": {
+            "columnSeparatorStyle": "NONE",
+            "contentDirection": "LEFT_TO_RIGHT"
+          }
+        }
+      }
+    ]
+  },
+  "documentStyle": {
+    "background": { "color": {} }
+  },
+  "suggestionsViewMode": "SUGGESTIONS_INLINE"
+}

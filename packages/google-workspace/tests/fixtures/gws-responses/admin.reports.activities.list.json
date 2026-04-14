@@ -1,0 +1,57 @@
+{
+  "kind": "admin#reports#activities",
+  "etag": "\"FAKEETAG_0000000001\"",
+  "nextPageToken": "A:1712345678900:0000000000000001",
+  "items": [
+    {
+      "kind": "admin#reports#activity",
+      "id": {
+        "time": "2026-04-10T15:12:43.000Z",
+        "uniqueQualifier": "-1000000000000000001",
+        "applicationName": "login",
+        "customerId": "C0FAKECUST"
+      },
+      "etag": "\"FAKEETAG_0000000002\"",
+      "actor": {
+        "callerType": "USER",
+        "email": "audited-user@example.com",
+        "profileId": "100000000000000000001"
+      },
+      "ipAddress": "203.0.113.5",
+      "events": [
+        {
+          "type": "login",
+          "name": "login_success",
+          "parameters": [
+            { "name": "login_type", "value": "google_password" }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "admin#reports#activity",
+      "id": {
+        "time": "2026-04-10T15:44:02.000Z",
+        "uniqueQualifier": "-1000000000000000002",
+        "applicationName": "drive",
+        "customerId": "C0FAKECUST"
+      },
+      "etag": "\"FAKEETAG_0000000003\"",
+      "actor": {
+        "callerType": "USER",
+        "email": "audited-user@example.com",
+        "profileId": "100000000000000000001"
+      },
+      "events": [
+        {
+          "type": "access",
+          "name": "view",
+          "parameters": [
+            { "name": "doc_id", "value": "1FAKE_FILE_ID_ABCDEFGHIJKLMNOPQRSTUV" },
+            { "name": "doc_title", "value": "Sample Document.docx" }
+          ]
+        }
+      ]
+    }
+  ]
+}

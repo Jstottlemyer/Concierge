@@ -1,0 +1,20 @@
+[Helper] Sanitize a user prompt through a Model Armor template
+
+Usage: gws +sanitize-prompt [OPTIONS] --template <NAME>
+
+Options:
+      --sanitize <TEMPLATE>  Sanitize API responses through a Model Armor template. Requires cloud-platform scope. Format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE. Also reads GWS_SANITIZE_TEMPLATE env var.
+      --template <NAME>      Full template resource name (projects/PROJECT/locations/LOCATION/templates/TEMPLATE)
+      --dry-run              Validate the request locally without sending it to the API
+      --text <TEXT>          Text content to sanitize
+      --format <FORMAT>      Output format: json (default), table, yaml, csv
+      --json <JSON>          Full JSON request body (overrides --text)
+  -h, --help                 Print help
+
+EXAMPLES:
+  gws modelarmor +sanitize-prompt --template projects/P/locations/L/templates/T --text 'user input'
+  echo 'prompt' | gws modelarmor +sanitize-prompt --template ...
+
+TIPS:
+  If neither --text nor --json is given, reads from stdin.
+  For outbound safety, use +sanitize-response instead.

@@ -1,0 +1,17 @@
+[Helper] Today's meetings + open tasks as a standup summary
+
+Usage: gws +standup-report [OPTIONS]
+
+Options:
+      --format <FORMAT>      Output format: json (default), table, yaml, csv
+      --sanitize <TEMPLATE>  Sanitize API responses through a Model Armor template. Requires cloud-platform scope. Format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE. Also reads GWS_SANITIZE_TEMPLATE env var.
+      --dry-run              Validate the request locally without sending it to the API
+  -h, --help                 Print help
+
+EXAMPLES:
+  gws workflow +standup-report
+  gws workflow +standup-report --format table
+
+TIPS:
+  Read-only — never modifies data.
+  Combines calendar agenda (today) with tasks list.

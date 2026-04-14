@@ -1,0 +1,125 @@
+# Upstream gws regression guard — surfaces new releases without auto-bumping.
+#
+# Per plan.md Decision #11: we do NOT blindly track upstream latest. Instead,
+# this workflow runs weekly (and on-demand) to:
+#   1. Query the googleworkspace/cli GitHub API for the latest release tag.
+#   2. Download + sha256 both darwin arch tarballs.
+#   3. Diff against committed `packages/google-workspace/build/gws-checksums.txt`.
+#   4. If the pin is stale, emit a summary with the proposed new
+#      sha256+version pair so a human can open a PR. The PR still has to
+#      pass integration (T25 + T30) on the candidate before the checksum
+#      can be committed.
+#
+# Spec refs:
+#   - spec.md §Distribution
+#   - plan.md Decision #11 (binary integrity + regression guard)
+name: regression-guard
+
+on:
+  schedule:
+    # Mondays at 15:00 UTC (8am Pacific).
+    - cron: '0 15 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check-upstream-gws-latest:
+    name: check upstream gws latest vs committed pin
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Query latest upstream gws release
+        id: upstream
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Use gh API rather than raw curl to benefit from retries + rate limits.
+          latest="$(gh api repos/googleworkspace/cli/releases/latest --jq '.tag_name')"
+          if [[ -z "$latest" || "$latest" == "null" ]]; then
+            echo "::error::could not fetch latest release tag from googleworkspace/cli"
+            exit 1
+          fi
+          echo "latest_tag=$latest" >> "$GITHUB_OUTPUT"
+          echo "upstream latest tag: $latest"
+
+      - name: Diff pinned vs upstream sha256 per arch
+        id: diff
+        env:
+          LATEST: ${{ steps.upstream.outputs.latest_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          drift=0
+          summary="## gws regression-guard report\n\nUpstream latest: \`${LATEST}\`\n\n| arch | pinned version | pinned sha256 | upstream sha256 | status |\n| --- | --- | --- | --- | --- |\n"
+
+          declare -A ASSET_FOR
+          ASSET_FOR[darwin-arm64]="gws_Darwin_arm64.tar.gz"
+          ASSET_FOR[darwin-x64]="gws_Darwin_x86_64.tar.gz"
+
+          for arch in darwin-arm64 darwin-x64; do
+            line="$(grep -E "^[0-9a-f]{64}[[:space:]]+${arch}[[:space:]]+v" packages/google-workspace/build/gws-checksums.txt | head -n1 || true)"
+            if [[ -z "$line" ]]; then
+              pinned_sha="(missing)"
+              pinned_version="(missing)"
+            else
+              pinned_sha="$(echo "$line" | awk '{print $1}')"
+              pinned_version="$(echo "$line" | awk '{print $3}')"
+            fi
+
+            asset="${ASSET_FOR[$arch]}"
+            url="https://github.com/googleworkspace/cli/releases/download/${LATEST}/${asset}"
+
+            tmp="$(mktemp -d)"
+            if ! curl -fsSL -o "${tmp}/${asset}" "$url"; then
+              echo "::warning::failed to download ${url} — skipping $arch"
+              summary+="| ${arch} | ${pinned_version} | ${pinned_sha:0:12}… | (download failed) | SKIP |\n"
+              continue
+            fi
+            tar -xzf "${tmp}/${asset}" -C "${tmp}"
+            bin_path="$(find "${tmp}" -type f -name gws | head -n1 || true)"
+            if [[ -z "$bin_path" ]]; then
+              summary+="| ${arch} | ${pinned_version} | ${pinned_sha:0:12}… | (extraction failed) | SKIP |\n"
+              continue
+            fi
+            upstream_sha="$(sha256sum "$bin_path" | awk '{print $1}')"
+
+            status="UP_TO_DATE"
+            if [[ "$pinned_version" != "$LATEST" ]] || [[ "$pinned_sha" != "$upstream_sha" ]]; then
+              status="DRIFT"
+              drift=1
+            fi
+            summary+="| ${arch} | ${pinned_version} | ${pinned_sha:0:12}… | ${upstream_sha:0:12}… | ${status} |\n"
+
+            # If drift, emit the full proposed pin line for the PR body.
+            if [[ "$status" == "DRIFT" ]]; then
+              summary+="\n**Proposed pin for ${arch}:**\n\n\`\`\`\n${upstream_sha}  ${arch}    ${LATEST}\n\`\`\`\n"
+            fi
+
+            rm -rf "$tmp"
+          done
+
+          if [[ "$drift" -eq 1 ]]; then
+            summary+="\n> **Action required**: open a PR bumping \`packages/google-workspace/build/gws-checksums.txt\` to the proposed values. Per Decision #11 the PR must pass the integration suite (T25 + T30) before merge.\n"
+          else
+            summary+="\n> Pin matches upstream latest. No action needed.\n"
+          fi
+
+          # Write to the workflow summary (visible on the run page).
+          printf "%b" "$summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "drift=$drift" >> "$GITHUB_OUTPUT"
+
+      - name: Non-failing status
+        shell: bash
+        run: |
+          # This workflow is informational — do NOT fail on drift. A human
+          # reviews the summary and opens the PR. Failing would just create
+          # weekly false-alarm red X's on the main branch.
+          echo "regression-guard run complete (drift=${{ steps.diff.outputs.drift }})"

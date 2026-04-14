@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+packages/*/dist/
+packages/*/build/
+!packages/*/build/gws-checksums.txt
+!packages/*/build/README.md
+!packages/*/build/pack.sh
+!packages/*/build/verify-pack.sh
+!packages/*/build/enable-apis.sh
+*.tsbuildinfo
+
+# MCPB packaging
+.mcpb-staging/
+packages/*/.mcpb-staging/
+packages/*/bin/gws
+*.mcpb
+
+# Test & coverage
+coverage/
+.vitest/
+*.lcov
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.history/
+
+# OS / tooling caches
+.cache/
+.parcel-cache/
+.eslintcache
+.turbo/
+
+# Claude / local scratch
+.claude/settings.local.json

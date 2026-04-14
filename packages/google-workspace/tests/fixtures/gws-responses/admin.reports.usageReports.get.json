@@ -1,0 +1,23 @@
+{
+  "kind": "admin#reports#usageReports",
+  "etag": "\"FAKEUSAGE_ETAG_0000\"",
+  "warnings": [],
+  "usageReports": [
+    {
+      "kind": "admin#reports#usageReport",
+      "date": "2026-04-09",
+      "etag": "\"FAKEUSAGE_ETAG_0001\"",
+      "entity": {
+        "type": "USER",
+        "customerId": "C0FAKECUST",
+        "userEmail": "audited-user@example.com",
+        "profileId": "100000000000000000001"
+      },
+      "parameters": [
+        { "name": "accounts:last_login_time", "datetimeValue": "2026-04-09T08:12:00.000Z" },
+        { "name": "gmail:num_emails_received", "intValue": "42" },
+        { "name": "drive:num_owned_items_edited", "intValue": "7" }
+      ]
+    }
+  ]
+}

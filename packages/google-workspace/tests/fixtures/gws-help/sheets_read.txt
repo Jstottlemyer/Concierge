@@ -1,0 +1,19 @@
+[Helper] Read values from a spreadsheet
+
+Usage: gws +read [OPTIONS] --spreadsheet <ID> --range <RANGE>
+
+Options:
+      --sanitize <TEMPLATE>  Sanitize API responses through a Model Armor template. Requires cloud-platform scope. Format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE. Also reads GWS_SANITIZE_TEMPLATE env var.
+      --spreadsheet <ID>     Spreadsheet ID
+      --dry-run              Validate the request locally without sending it to the API
+      --range <RANGE>        Range to read (e.g. 'Sheet1!A1:B2')
+      --format <FORMAT>      Output format: json (default), table, yaml, csv
+  -h, --help                 Print help
+
+EXAMPLES:
+  gws sheets +read --spreadsheet ID --range "Sheet1!A1:D10"
+  gws sheets +read --spreadsheet ID --range Sheet1
+
+TIPS:
+  Read-only — never modifies the spreadsheet.
+  For advanced options, use the raw values.get API.

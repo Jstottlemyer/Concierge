@@ -1,0 +1,16 @@
+Manages and executes Google Apps Script projects. 
+
+Usage: gws [OPTIONS] <COMMAND>
+
+Commands:
+  +push      [Helper] Upload local files to an Apps Script project
+  processes  Operations on the 'processes' resource
+  projects   Operations on the 'projects' resource
+  scripts    Operations on the 'scripts' resource
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --sanitize <TEMPLATE>  Sanitize API responses through a Model Armor template. Requires cloud-platform scope. Format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE. Also reads GWS_SANITIZE_TEMPLATE env var.
+      --dry-run              Validate the request locally without sending it to the API
+      --format <FORMAT>      Output format: json (default), table, yaml, csv
+  -h, --help                 Print help

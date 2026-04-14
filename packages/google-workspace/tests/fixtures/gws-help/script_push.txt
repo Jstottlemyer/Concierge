@@ -1,0 +1,20 @@
+[Helper] Upload local files to an Apps Script project
+
+Usage: gws +push [OPTIONS] --script <ID>
+
+Options:
+      --sanitize <TEMPLATE>  Sanitize API responses through a Model Armor template. Requires cloud-platform scope. Format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE. Also reads GWS_SANITIZE_TEMPLATE env var.
+      --script <ID>          Script Project ID
+      --dir <DIR>            Directory containing script files (defaults to current dir)
+      --dry-run              Validate the request locally without sending it to the API
+      --format <FORMAT>      Output format: json (default), table, yaml, csv
+  -h, --help                 Print help
+
+EXAMPLES:
+  gws script +push --script SCRIPT_ID
+  gws script +push --script SCRIPT_ID --dir ./src
+
+TIPS:
+  Supports .gs, .js, .html, and appsscript.json files.
+  Skips hidden files and node_modules automatically.
+  This replaces ALL files in the project.

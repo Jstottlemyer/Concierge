@@ -1,0 +1,19 @@
+[Helper] Convert a Gmail message into a Google Tasks entry
+
+Usage: gws +email-to-task [OPTIONS] --message-id <ID>
+
+Options:
+      --message-id <ID>      Gmail message ID to convert
+      --sanitize <TEMPLATE>  Sanitize API responses through a Model Armor template. Requires cloud-platform scope. Format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE. Also reads GWS_SANITIZE_TEMPLATE env var.
+      --dry-run              Validate the request locally without sending it to the API
+      --tasklist <ID>        Task list ID (default: @default) [default: @default]
+      --format <FORMAT>      Output format: json (default), table, yaml, csv
+  -h, --help                 Print help
+
+EXAMPLES:
+  gws workflow +email-to-task --message-id MSG_ID
+  gws workflow +email-to-task --message-id MSG_ID --tasklist LIST_ID
+
+TIPS:
+  Reads the email subject as the task title and snippet as notes.
+  Creates a new task — confirm with the user before executing.

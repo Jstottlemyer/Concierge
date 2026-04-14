@@ -1,0 +1,9 @@
+Configure GCP project + OAuth client (requires gcloud)
+
+Usage: setup [OPTIONS]
+
+Options:
+      --project <id>  Use a specific GCP project
+      --login         Run `gws auth login` after successful setup
+      --dry-run       Preview changes without making them
+  -h, --help          Print help

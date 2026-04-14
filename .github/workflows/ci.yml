@@ -1,0 +1,157 @@
+# CI pipeline — runs lint, typecheck, tests, build, and the sha256 integrity
+# gate on every push and pull request.
+#
+# Hybrid matrix per plan.md T19: ubuntu for lint/unit/build (fast, cheap);
+# macOS-only packaging lives in package-mcpb.yml because `.mcpb` assembly
+# needs the darwin gws binary. On ubuntu we can still verify the pinned
+# sha256s — we only read bytes from the upstream tarballs, we don't execute
+# them.
+#
+# Spec refs:
+#   - spec.md §Distribution AC §29–31
+#   - plan.md Decision #11 (binary integrity + regression guard)
+#   - plan.md T19, T20
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref — saves runner minutes on rapid
+# push cycles. Tag/release runs get their own group so they never cancel.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test-build:
+    name: lint + typecheck + test + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # Pinned to match `packageManager` field in package.json.
+          version: 10.33.0
+
+      - name: Setup Node 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm -r lint
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Test
+        run: pnpm -r test
+
+      - name: Build
+        run: pnpm --filter @concierge/google-workspace build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: packages/google-workspace/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  verify-gws-checksums:
+    name: verify bundled gws sha256 pins
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify each pinned arch against upstream release tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CHECKSUM_FILE="packages/google-workspace/build/gws-checksums.txt"
+          if [[ ! -f "$CHECKSUM_FILE" ]]; then
+            echo "::error::$CHECKSUM_FILE not found"
+            exit 1
+          fi
+
+          fail=0
+          # Parse non-comment lines: <sha256>  <arch>  <version>
+          while IFS= read -r line; do
+            # Strip comments and blanks.
+            trimmed="${line%%#*}"
+            trimmed="$(echo "$trimmed" | xargs || true)"
+            [[ -z "$trimmed" ]] && continue
+
+            read -r expected_sha arch version <<<"$trimmed"
+
+            if [[ "$expected_sha" == "PENDING_CAPTURE_FROM_UPSTREAM" ]]; then
+              echo "::warning::$arch is PENDING_CAPTURE_FROM_UPSTREAM — skipping verification"
+              continue
+            fi
+
+            case "$arch" in
+              darwin-arm64) asset="gws_Darwin_arm64.tar.gz" ;;
+              darwin-x64)   asset="gws_Darwin_x86_64.tar.gz" ;;
+              *)
+                echo "::error::unknown arch '$arch' in $CHECKSUM_FILE"
+                fail=1
+                continue
+                ;;
+            esac
+
+            url="https://github.com/googleworkspace/cli/releases/download/${version}/${asset}"
+            echo "--- verifying $arch ($version) ---"
+            echo "downloading: $url"
+
+            tmp="$(mktemp -d)"
+            curl -fsSL -o "${tmp}/${asset}" "$url"
+            tar -xzf "${tmp}/${asset}" -C "${tmp}"
+
+            # Locate the `gws` binary inside the extracted tree (upstream layout
+            # has historically been flat, but guard against nested layouts).
+            bin_path="$(find "${tmp}" -type f -name gws -perm -u+x | head -n1 || true)"
+            if [[ -z "$bin_path" ]]; then
+              bin_path="$(find "${tmp}" -type f -name gws | head -n1 || true)"
+            fi
+            if [[ -z "$bin_path" ]]; then
+              echo "::error::could not find gws binary in extracted tarball for $arch"
+              fail=1
+              continue
+            fi
+
+            actual_sha="$(sha256sum "$bin_path" | awk '{print $1}')"
+
+            if [[ "$actual_sha" == "$expected_sha" ]]; then
+              echo "OK: $arch $version sha256 matches pin"
+            else
+              echo "::error::sha256 mismatch for $arch $version"
+              echo "  expected: $expected_sha"
+              echo "  actual:   $actual_sha"
+              fail=1
+            fi
+
+            rm -rf "$tmp"
+          done < "$CHECKSUM_FILE"
+
+          if [[ "$fail" -ne 0 ]]; then
+            echo "::error::one or more sha256 pins did not match upstream — refusing to release"
+            exit 1
+          fi
+          echo "all pinned sha256s verified against upstream"

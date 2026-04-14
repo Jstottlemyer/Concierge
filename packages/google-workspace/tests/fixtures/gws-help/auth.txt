@@ -1,0 +1,14 @@
+Manage authentication for Google Workspace APIs
+
+Usage: auth [COMMAND]
+
+Commands:
+  login   Authenticate via OAuth2 (opens browser)
+  setup   Configure GCP project + OAuth client (requires gcloud)
+  status  Show current authentication state
+  export  Print decrypted credentials to stdout
+  logout  Clear saved credentials and token cache
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

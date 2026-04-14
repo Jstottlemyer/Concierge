@@ -1,0 +1,30 @@
+[Helper] Watch for new emails and stream them as NDJSON
+
+Usage: gws +watch [OPTIONS]
+
+Options:
+      --project <PROJECT>     GCP project ID for Pub/Sub resources
+      --sanitize <TEMPLATE>   Sanitize API responses through a Model Armor template. Requires cloud-platform scope. Format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE. Also reads GWS_SANITIZE_TEMPLATE env var.
+      --dry-run               Validate the request locally without sending it to the API
+      --subscription <NAME>   Existing Pub/Sub subscription name (skip setup)
+      --format <FORMAT>       Output format: json (default), table, yaml, csv
+      --topic <TOPIC>         Existing Pub/Sub topic with Gmail push permission already granted
+      --label-ids <LABELS>    Comma-separated Gmail label IDs to filter (e.g., INBOX,UNREAD)
+      --max-messages <N>      Max messages per pull batch [default: 10]
+      --poll-interval <SECS>  Seconds between pulls [default: 5]
+      --msg-format <FORMAT>   Gmail message format: full, metadata, minimal, raw [default: full] [possible values: full, metadata, minimal, raw]
+      --once                  Pull once and exit
+      --cleanup               Delete created Pub/Sub resources on exit
+      --output-dir <DIR>      Write each message to a separate JSON file in this directory
+  -h, --help                  Print help
+
+EXAMPLES:
+  gws gmail +watch --project my-gcp-project
+  gws gmail +watch --project my-project --label-ids INBOX --once
+  gws gmail +watch --subscription projects/p/subscriptions/my-sub
+  gws gmail +watch --project my-project --cleanup --output-dir ./emails
+
+TIPS:
+  Gmail watch expires after 7 days — re-run to renew.
+  Without --cleanup, Pub/Sub resources persist for reconnection.
+  Press Ctrl-C to stop gracefully.

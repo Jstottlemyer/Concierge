@@ -1,0 +1,26 @@
+{
+  "name": "concierge-monorepo",
+  "private": true,
+  "description": "Concierge monorepo — workspace root for @concierge/core and vendor packages (google-workspace, ...).",
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "pnpm -r --filter=!concierge-monorepo build",
+    "test": "pnpm -r --filter=!concierge-monorepo test",
+    "lint": "pnpm -r --filter=!concierge-monorepo lint",
+    "typecheck": "pnpm -r --filter=!concierge-monorepo typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^20.12.0",
+    "@typescript-eslint/eslint-plugin": "latest",
+    "@typescript-eslint/parser": "latest",
+    "eslint": "^9.0.0",
+    "tsup": "latest",
+    "typescript": "^5.4.0",
+    "vitest": "latest"
+  }
+}

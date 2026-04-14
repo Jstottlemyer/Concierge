@@ -1,0 +1,28 @@
+[Helper] Subscribe to Workspace events and stream them as NDJSON
+
+Usage: gws +subscribe [OPTIONS]
+
+Options:
+      --sanitize <TEMPLATE>   Sanitize API responses through a Model Armor template. Requires cloud-platform scope. Format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE. Also reads GWS_SANITIZE_TEMPLATE env var.
+      --target <URI>          Workspace resource URI (e.g., //chat.googleapis.com/spaces/SPACE_ID)
+      --dry-run               Validate the request locally without sending it to the API
+      --event-types <TYPES>   Comma-separated CloudEvents types to subscribe to
+      --format <FORMAT>       Output format: json (default), table, yaml, csv
+      --project <PROJECT>     GCP project ID for Pub/Sub resources
+      --subscription <NAME>   Existing Pub/Sub subscription name (skip setup)
+      --max-messages <N>      Max messages per pull batch (default: 10) [default: 10]
+      --poll-interval <SECS>  Seconds between pulls (default: 5) [default: 5]
+      --once                  Pull once and exit
+      --cleanup               Delete created Pub/Sub resources on exit
+      --no-ack                Don't auto-acknowledge messages
+      --output-dir <DIR>      Write each event to a separate JSON file in this directory
+  -h, --help                  Print help
+
+EXAMPLES:
+  gws events +subscribe --target '//chat.googleapis.com/spaces/SPACE' --event-types 'google.workspace.chat.message.v1.created' --project my-project
+  gws events +subscribe --subscription projects/p/subscriptions/my-sub --once
+  gws events +subscribe ... --cleanup --output-dir ./events
+
+TIPS:
+  Without --cleanup, Pub/Sub resources persist for reconnection.
+  Press Ctrl-C to stop gracefully.

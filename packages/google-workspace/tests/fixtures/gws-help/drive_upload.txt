@@ -1,0 +1,23 @@
+[Helper] Upload a file with automatic metadata
+
+Usage: gws +upload [OPTIONS] <file>
+
+Arguments:
+  <file>  Path to file to upload
+
+Options:
+      --parent <ID>          Parent folder ID
+      --sanitize <TEMPLATE>  Sanitize API responses through a Model Armor template. Requires cloud-platform scope. Format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE. Also reads GWS_SANITIZE_TEMPLATE env var.
+      --dry-run              Validate the request locally without sending it to the API
+      --name <NAME>          Target filename (defaults to source filename)
+      --format <FORMAT>      Output format: json (default), table, yaml, csv
+  -h, --help                 Print help
+
+EXAMPLES:
+  gws drive +upload ./report.pdf
+  gws drive +upload ./report.pdf --parent FOLDER_ID
+  gws drive +upload ./data.csv --name 'Sales Data.csv'
+
+TIPS:
+  MIME type is detected automatically.
+  Filename is inferred from the local path unless --name is given.
