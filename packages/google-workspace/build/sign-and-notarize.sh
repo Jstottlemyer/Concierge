@@ -118,11 +118,21 @@ else
 fi
 
 set +e
-SUBMIT_JSON="$("${TIMEOUT_CMD[@]}" xcrun notarytool submit "$MCPB" \
-  --keychain-profile "$NOTARY_PROFILE" \
-  --team-id "$TEAM_ID" \
-  --wait \
-  --output-format json 2>&1)"
+# bash 3.2 (macOS default) trips on "${empty_array[@]}" under `set -u`, so
+# branch explicitly instead of splatting a possibly-empty TIMEOUT_CMD array.
+if [[ ${#TIMEOUT_CMD[@]} -gt 0 ]]; then
+  SUBMIT_JSON="$("${TIMEOUT_CMD[@]}" xcrun notarytool submit "$MCPB" \
+    --keychain-profile "$NOTARY_PROFILE" \
+    --team-id "$TEAM_ID" \
+    --wait \
+    --output-format json 2>&1)"
+else
+  SUBMIT_JSON="$(xcrun notarytool submit "$MCPB" \
+    --keychain-profile "$NOTARY_PROFILE" \
+    --team-id "$TEAM_ID" \
+    --wait \
+    --output-format json 2>&1)"
+fi
 SUBMIT_RC=$?
 set -e
 
