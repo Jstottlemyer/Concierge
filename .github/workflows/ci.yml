@@ -107,8 +107,8 @@ jobs:
             fi
 
             case "$arch" in
-              darwin-arm64) asset="gws_Darwin_arm64.tar.gz" ;;
-              darwin-x64)   asset="gws_Darwin_x86_64.tar.gz" ;;
+              darwin-arm64) asset="google-workspace-cli-aarch64-apple-darwin.tar.gz" ;;
+              darwin-x64)   asset="google-workspace-cli-x86_64-apple-darwin.tar.gz" ;;
               *)
                 echo "::error::unknown arch '$arch' in $CHECKSUM_FILE"
                 fail=1

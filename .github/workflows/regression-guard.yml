@@ -61,8 +61,8 @@ jobs:
           summary="## gws regression-guard report\n\nUpstream latest: \`${LATEST}\`\n\n| arch | pinned version | pinned sha256 | upstream sha256 | status |\n| --- | --- | --- | --- | --- |\n"
 
           declare -A ASSET_FOR
-          ASSET_FOR[darwin-arm64]="gws_Darwin_arm64.tar.gz"
-          ASSET_FOR[darwin-x64]="gws_Darwin_x86_64.tar.gz"
+          ASSET_FOR[darwin-arm64]="google-workspace-cli-aarch64-apple-darwin.tar.gz"
+          ASSET_FOR[darwin-x64]="google-workspace-cli-x86_64-apple-darwin.tar.gz"
 
           for arch in darwin-arm64 darwin-x64; do
             line="$(grep -E "^[0-9a-f]{64}[[:space:]]+${arch}[[:space:]]+v" packages/google-workspace/build/gws-checksums.txt | head -n1 || true)"
