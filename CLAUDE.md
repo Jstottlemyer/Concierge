@@ -46,7 +46,7 @@ Rules specific to this codebase. Apply in addition to user-level `~/CLAUDE.md`.
 
 ## Testing discipline
 
-- All 733+ tests must stay green. New work adds tests; existing tests never get deleted without a spec-level justification.
+- All tests (500+ cases across ~67 suites) must stay green. New work adds tests; existing tests never get deleted without a spec-level justification.
 - `pnpm -r typecheck && pnpm -r test && pnpm -r lint` is the green-bar before any commit.
 - Integration tests gated behind `CONCIERGE_INTEGRATION=1` (needs real gws + authenticated account).
 - Perf benchmarks gated behind `CONCIERGE_PERF=1`.
