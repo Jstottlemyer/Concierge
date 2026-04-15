@@ -64,3 +64,13 @@ Icon
 
 # Claude / local scratch
 .claude/settings.local.json
+
+# Agent-generated planning & review artifacts (not part of shipped software).
+# License is MIT; no obligation to distribute these.
+docs/specs/
+docs/constitution.md
+docs/vendors/*/spec.md
+docs/vendors/*/plan.md
+docs/vendors/*/review.md
+docs/vendors/*/check.md
+docs/vendors/*/spikes.md
