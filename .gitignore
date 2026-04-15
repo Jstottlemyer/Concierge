@@ -5,12 +5,13 @@ node_modules/
 # Build output
 dist/
 packages/*/dist/
-packages/*/build/
+packages/*/build/*
 !packages/*/build/gws-checksums.txt
 !packages/*/build/README.md
 !packages/*/build/pack.sh
 !packages/*/build/verify-pack.sh
 !packages/*/build/enable-apis.sh
+!packages/*/build/sign-and-notarize.sh
 *.tsbuildinfo
 
 # MCPB packaging

@@ -1,0 +1,9 @@
+# Concierge — bundled gws binary checksum pin
+# Format: <sha256>  <arch>  <version>
+# Hashes are for the extracted `gws` binary (not the tarball).
+# This file is the source of truth for CI's integrity gate (T20).
+# When bumping gws version: update ALL lines in one PR; CI verifies sha256 matches
+# the downloaded upstream release tarball before bundling.
+
+0f27b8b0815bf09cdf95da48d3c604f05ceb8f16bf5c9f0ba355b1f957cdd47e  darwin-arm64  v0.22.5
+cfaf3c184ffe4ed4609cc6fbd75cc64ffa97b4cb7a71ceb7302ab8e89cd3f163  darwin-x64    v0.22.5
