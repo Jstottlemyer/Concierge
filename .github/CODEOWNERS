@@ -1,0 +1,22 @@
+# Code owners for Concierge.
+#
+# Branch protection on `main` enforces "Require review from Code Owners"
+# on any PR that touches the paths below. This is the #1 mitigation for the
+# workflow-edit exfiltration attack (R1 in docs/specs/ci-signing-automation/
+# plan.md) — without it, a malicious push to `main` could add a secret-
+# exfiltrating step to a workflow and sign it with the repo's p12.
+#
+# Patterns are last-match-wins (per GitHub CODEOWNERS spec).
+
+# Workflow files — anything that touches CI or release infra must be
+# reviewed by Justin. This is the critical one for signing security.
+.github/workflows/  @Jstottlemyer
+.github/actions/    @Jstottlemyer
+
+# Signing + release infra scripts (the other surface attackers would target
+# if they couldn't edit workflows directly).
+packages/*/build/   @Jstottlemyer
+
+# Fallback — every other path defaults to Justin as sole maintainer.
+# Remove or narrow once the project gains contributors.
+*                   @Jstottlemyer
