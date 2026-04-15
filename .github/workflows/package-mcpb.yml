@@ -39,6 +39,9 @@ concurrency:
 
 env:
   PKG_DIR: packages/google-workspace
+  # Opt into Node 24 runtime for JS actions ahead of the 2026-06-02 default
+  # flip (silences deprecation warnings from checkout/setup-node/upload-artifact).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # Prereq: full ubuntu CI must pass before we burn macOS minutes.

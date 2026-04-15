@@ -28,6 +28,12 @@ concurrency:
 permissions:
   contents: read
 
+# Opt into Node 24 runtime for JS actions ahead of the 2026-06-02 default flip.
+# Silences the deprecation warning for actions/checkout@v4, setup-node@v4,
+# upload-artifact@v4, pnpm/action-setup@v4.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   lint-test-build:
     name: lint + typecheck + test + build

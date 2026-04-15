@@ -24,6 +24,10 @@ on:
 permissions:
   contents: read
 
+# Opt into Node 24 runtime for JS actions ahead of the 2026-06-02 default flip.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   check-upstream-gws-latest:
     name: check upstream gws latest vs committed pin
