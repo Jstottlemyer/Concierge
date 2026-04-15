@@ -57,6 +57,11 @@ Rules specific to this codebase. Apply in addition to user-level `~/CLAUDE.md`.
 - Per-vendor packaging: `packages/<vendor>/build/pack.sh` produces `Concierge-<Vendor>-<version>-<arch>.mcpb`.
 - CI workflows (`.github/workflows/package-mcpb.yml`) are per-arch; pinned gws checksum per vendor in `packages/<vendor>/build/gws-checksums.txt`.
 
+## Signing prerequisites (macOS)
+
+- `brew install coreutils` is required before running `CONCIERGE_SIGN=1 ./build/pack.sh`. The signer caps the notary wait at 1800s via `gtimeout`; without it the fallback branch warns and has no upper bound on the wait.
+- macOS ships bash 3.2. Avoid `"${empty_array[@]}"` under `set -u` — it errors as "unbound variable". Branch on `${#arr[@]}` or use the `${arr[@]+"${arr[@]}"}` idiom instead.
+
 ## Target persona
 
 v1 primary user: startup CEO (PashionFootwear). Gmail + Sheets + Forms are the high-frequency triad. Admin bundle is genuinely wanted but mocked-only in v1 (drift detector guards against fixture divergence).
