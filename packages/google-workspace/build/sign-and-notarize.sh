@@ -52,6 +52,11 @@
 
 set -euo pipefail
 
+# SECURITY: never enable `set -x` in this script or in any caller that sets
+# CONCIERGE_* env vars — a single echoed line can leak p12 password or API key
+# contents to public workflow logs. If you need to debug locally, use
+# `bash -v` or add targeted echoes, not blanket tracing.
+
 MCPB="${1:?usage: $0 <path-to-mcpb>}"
 if [[ ! -f "$MCPB" ]]; then
   echo "error: .mcpb not found at '$MCPB'" >&2
@@ -59,11 +64,15 @@ if [[ ! -f "$MCPB" ]]; then
 fi
 
 MCPB="$(cd "$(dirname "$MCPB")" && pwd)/$(basename "$MCPB")"
-SIGNING_IDENTITY="Developer ID Application: JUSTIN HAYES STOTTLEMYER (P5FDYS88B7)"
-TEAM_ID="P5FDYS88B7"
-NOTARY_PROFILE="concierge-notarize"
-GWS_IDENTIFIER="com.justin-stottlemyer.concierge.gws"
-NOTARY_TIMEOUT_SEC=1800
+
+# Defaults preserve byte-identical local behavior when no CONCIERGE_* overrides
+# are set. CI wires these via env to point at its temp keychain / API-key
+# profile. See docs/specs/ci-signing-automation/spec.md §Q1.
+SIGNING_IDENTITY="${CONCIERGE_SIGNING_IDENTITY:-Developer ID Application: JUSTIN HAYES STOTTLEMYER (P5FDYS88B7)}"
+TEAM_ID="${CONCIERGE_TEAM_ID:-P5FDYS88B7}"
+NOTARY_PROFILE="${CONCIERGE_NOTARY_PROFILE:-concierge-notarize}"
+GWS_IDENTIFIER="${CONCIERGE_GWS_IDENTIFIER:-com.justin-stottlemyer.concierge.gws}"
+NOTARY_TIMEOUT_SEC="${CONCIERGE_NOTARY_TIMEOUT_SEC:-1800}"
 
 echo "[sign] target: $MCPB"
 
@@ -144,6 +153,16 @@ if [[ $SUBMIT_RC -eq 124 ]]; then
   echo "  xcrun notarytool history --keychain-profile $NOTARY_PROFILE --team-id $TEAM_ID" >&2
   exit 1
 fi
+
+# Agreement-expired detection BEFORE the generic rc check. Apple's 403 response
+# wording varies ("is missing or has expired" / "not yet accepted" / "not
+# accepted" / "required agreement"), so we use a broadened regex. Exit code 2
+# signals "go sign a Developer Program agreement" (distinct from generic fail).
+if echo "$SUBMIT_JSON" | grep -qiE "agreement.*(missing|expired|required|not[[:space:]]+(yet[[:space:]]+)?(been[[:space:]]+)?accepted)"; then
+  echo "::error title=Apple Developer Program agreement expired or unsigned::Sign at https://developer.apple.com/account/resources/agreements and https://appstoreconnect.apple.com/agreements" >&2
+  exit 2
+fi
+
 if [[ $SUBMIT_RC -ne 0 ]]; then
   echo "[sign] ERROR: notarytool submit failed (rc=$SUBMIT_RC)" >&2
   exit 1

@@ -56,6 +56,7 @@ Rules specific to this codebase. Apply in addition to user-level `~/CLAUDE.md`.
 - `.mcpb` is self-contained: tsup bundles all runtime deps (including `@concierge/core`) into `dist/index.js`. No `node_modules/` vendoring needed anymore.
 - Per-vendor packaging: `packages/<vendor>/build/pack.sh` produces `Concierge-<Vendor>-<version>-<arch>.mcpb`.
 - CI workflows (`.github/workflows/package-mcpb.yml`) are per-arch; pinned gws checksum per vendor in `packages/<vendor>/build/gws-checksums.txt`.
+- **CI signs + notarizes automatically on `google-workspace-v*.*.*` tag push** (darwin-arm64; x64 stays unsigned workflow-artifact only). Local `CONCIERGE_SIGN=1 ./build/pack.sh` remains the fallback for notary-degraded days or pre-tag dry runs.
 
 ## Signing prerequisites (macOS)
 
