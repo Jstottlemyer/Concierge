@@ -14,7 +14,7 @@
 // Callers are expected to memoize if they care about performance; the cost is
 // a handful of syscalls.
 
-import { accessSync, constants as fsConstants } from 'node:fs';
+import { accessSync, chmodSync, constants as fsConstants } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,6 +67,18 @@ export function resolveGwsBinary(): string {
     if (isExecutable(candidate)) {
       return path.resolve(candidate);
     }
+    // Belt-and-suspenders: if the binary exists but lacks the exec bit,
+    // restore it. Some .mcpb extraction paths (depending on the unpacker and
+    // macOS version) have been observed to drop the +x bit, producing
+    // EACCES at spawn that looks indistinguishable from a signing bug.
+    if (exists(candidate)) {
+      try {
+        chmodSync(candidate, 0o755);
+        if (isExecutable(candidate)) return path.resolve(candidate);
+      } catch {
+        // fall through to next candidate
+      }
+    }
   }
 
   // 3) PATH fallback — dev + CI only.
@@ -85,6 +97,16 @@ export function resolveGwsBinary(): string {
 function isExecutable(candidate: string): boolean {
   try {
     accessSync(candidate, fsConstants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** True if the path exists at all (even without exec bit). */
+function exists(candidate: string): boolean {
+  try {
+    accessSync(candidate, fsConstants.F_OK);
     return true;
   } catch {
     return false;
