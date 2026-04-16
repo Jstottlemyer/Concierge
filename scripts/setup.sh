@@ -160,9 +160,19 @@ gws auth status || die "gws auth status failed post-setup. Something went wrong.
 log "      verification ok."
 
 # ── 8. Install .mcpb into Claude Desktop ──────────────────────────────────
+#
+# Resolution order:
+#   1. Explicit path passed as $1 (highest priority)
+#   2. Auto-detect: repo root → ~/Downloads → ~/Desktop
+#   3. Auto-download: latest signed + notarized release from GitHub
+#
+# Step 3 requires the repo to be PUBLIC. On a private repo the GitHub API
+# returns 404 unauth, and we fall back to printing where to get the file.
 
-# Auto-detect: if no path given, look in common spots for the most recent
-# Concierge-GoogleWorkspace-*.mcpb the user may have downloaded.
+readonly REPO_SLUG="Jstottlemyer/Concierge"
+readonly GH_API="https://api.github.com/repos/${REPO_SLUG}"
+
+# 8a. Auto-detect locally if no explicit path
 if [[ -z "$MCPB_PATH" ]]; then
   for candidate in \
     "$REPO_ROOT"/Concierge-GoogleWorkspace-*-darwin-arm64.mcpb \
@@ -171,28 +181,57 @@ if [[ -z "$MCPB_PATH" ]]; then
   do
     if [[ -f "$candidate" ]]; then
       MCPB_PATH="$candidate"
+      log "[8/8] Found local .mcpb: $MCPB_PATH"
       break
     fi
   done
 fi
 
+# 8b. Auto-download from GitHub Releases if still nothing
+if [[ -z "$MCPB_PATH" ]]; then
+  log "[8/8] No local .mcpb; fetching latest from GitHub Releases..."
+  LATEST_JSON="$(curl -fsSL "${GH_API}/releases/latest" 2>/dev/null || true)"
+  if [[ -z "$LATEST_JSON" || "$LATEST_JSON" == *'"message": "Not Found"'* ]]; then
+    warn "      GitHub API returned nothing (repo is private or no public release yet)."
+    warn "      Obtain the .mcpb from the repo owner, drop it in ~/Downloads, and re-run."
+    exit 0
+  fi
+  DOWNLOAD_URL="$(printf '%s' "$LATEST_JSON" \
+    | grep -Eo '"browser_download_url":[[:space:]]*"[^"]*darwin-arm64\.mcpb"' \
+    | head -1 \
+    | cut -d'"' -f4 \
+    || true)"
+  if [[ -z "$DOWNLOAD_URL" ]]; then
+    warn "      Latest release has no darwin-arm64 .mcpb asset (possibly a release-in-progress)."
+    exit 0
+  fi
+  MCPB_FILENAME="$(basename "$DOWNLOAD_URL")"
+  MCPB_PATH="$HOME/Downloads/$MCPB_FILENAME"
+  log "      Downloading: $DOWNLOAD_URL"
+  curl -fsSL -o "$MCPB_PATH" "$DOWNLOAD_URL"
+  log "      Saved to $MCPB_PATH"
+
+  # Best-effort SLSA attestation check if gh CLI is available.
+  # Silent skip if gh isn't installed — it's an optional defense-in-depth.
+  if command -v gh >/dev/null 2>&1; then
+    if gh attestation verify "$MCPB_PATH" --repo "$REPO_SLUG" >/dev/null 2>&1; then
+      log "      SLSA attestation: ✓ verified"
+    else
+      warn "      SLSA attestation verify failed. File may be tampered, or attestation not yet published. Proceed with caution."
+    fi
+  fi
+fi
+
+# 8c. Install into Claude Desktop
 if [[ -n "$MCPB_PATH" && -f "$MCPB_PATH" ]]; then
-  log "[8/8] Found .mcpb: $MCPB_PATH"
-  if ask_yn "      Install into Claude Desktop now?"; then
+  log "      Ready to install: $MCPB_PATH"
+  if ask_yn "      Open in Claude Desktop now?"; then
     open -a "Claude" "$MCPB_PATH" 2>/dev/null \
       || warn "could not auto-open Claude; drag $MCPB_PATH into Claude Desktop → Settings → Extensions."
     log "      install initiated. Follow Claude Desktop's prompts to enable the extension."
   fi
 elif [[ -n "$MCPB_PATH" ]]; then
-  warn "[8/8] You passed '$MCPB_PATH' but that file doesn't exist."
-  warn "      Skipping Claude Desktop install. Re-run with a valid path when ready."
-else
-  log "[8/8] No .mcpb detected in ~/Downloads, ~/Desktop, or the repo root."
-  log "      To install the Concierge extension:"
-  log "        (a) obtain the Concierge-GoogleWorkspace-<version>-darwin-arm64.mcpb file,"
-  log "            either from Justin (v1 early users) or a GitHub release (future)"
-  log "        (b) drop it into ~/Downloads and re-run this script, OR"
-  log "            bash scripts/setup.sh /path/to/Concierge-*.mcpb"
+  warn "[8/8] You passed '$MCPB_PATH' but that file doesn't exist. Skipping install."
 fi
 
 # ── Done ───────────────────────────────────────────────────────────────────
