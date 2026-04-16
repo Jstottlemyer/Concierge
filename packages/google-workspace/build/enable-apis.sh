@@ -3,36 +3,39 @@
 #
 # Usage:
 #   ./build/enable-apis.sh                 # auto-detect project from ~/.config/gws/client_secret.json
-#   ./build/enable-apis.sh PROJECT_ID      # explicit
-#   ./build/enable-apis.sh PROJECT_ID all  # enable all 16 APIs (default is 7 for startup-CEO set)
+#   ./build/enable-apis.sh PROJECT_ID      # explicit project, default is 12 for personal-account set
+#   ./build/enable-apis.sh PROJECT_ID all  # enable all 16 APIs (incl. admin / classroom / modelarmor / events)
 #
 # Requires: gcloud CLI installed + authenticated (`gcloud auth login`)
 
 set -euo pipefail
 
-# Default APIs for the "startup CEO" persona — Gmail + Drive + Docs + Sheets + Forms + Calendar + Tasks
+# Default APIs for a personal Google account — the four user-facing bundles
+# (Productivity + Collaboration + Creator + Automation). Excludes admin /
+# classroom / modelarmor / events (opt in via second arg "all").
 DEFAULT_APIS=(
   gmail.googleapis.com
-  drive.googleapis.com
-  docs.googleapis.com
   sheets.googleapis.com
+  docs.googleapis.com
+  drive.googleapis.com
   forms.googleapis.com
   calendar-json.googleapis.com
   tasks.googleapis.com
-)
-
-# Full Concierge surface (includes the 9 services users may opt into later)
-ALL_APIS=(
-  "${DEFAULT_APIS[@]}"
+  slides.googleapis.com
   chat.googleapis.com
   meet.googleapis.com
   people.googleapis.com
-  slides.googleapis.com
   script.googleapis.com
-  admin.googleapis.com           # admin-reports
-  classroom.googleapis.com
-  workspaceevents.googleapis.com
-  modelarmor.googleapis.com
+)
+
+# Full Concierge surface (adds Workspace-admin-only + paid/niche on top of
+# DEFAULT_APIS). Opt-in via `./build/enable-apis.sh PROJECT_ID all`.
+ALL_APIS=(
+  "${DEFAULT_APIS[@]}"
+  admin.googleapis.com            # admin-reports — Workspace admin only
+  classroom.googleapis.com        # education-specific
+  workspaceevents.googleapis.com  # niche
+  modelarmor.googleapis.com       # paid Google Cloud product
 )
 
 need_cmd() {
@@ -71,7 +74,7 @@ if [[ "$MODE" == "all" ]]; then
   echo "[enable-apis] mode: all (${#APIS[@]} APIs)"
 else
   APIS=("${DEFAULT_APIS[@]}")
-  echo "[enable-apis] mode: default/startup-CEO (${#APIS[@]} APIs). Use 'all' as second arg for full set."
+  echo "[enable-apis] mode: default/personal-account (${#APIS[@]} APIs). Use 'all' as second arg for admin/classroom/modelarmor."
 fi
 
 echo "[enable-apis] enabling on project $PROJECT_ID:"

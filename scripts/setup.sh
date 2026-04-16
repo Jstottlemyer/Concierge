@@ -25,7 +25,7 @@
 set -euo pipefail
 
 readonly SCRIPT_NAME="setup.sh"
-readonly SERVICES="gmail,sheets,docs,drive,forms,calendar,tasks"
+readonly SERVICES="gmail,sheets,docs,drive,forms,calendar,tasks,slides,chat,meet,people,script"
 readonly REPO_SLUG="Jstottlemyer/Concierge"
 readonly ENABLE_APIS_SCRIPT="packages/google-workspace/build/enable-apis.sh"
 readonly ENABLE_APIS_RAW_URL="https://raw.githubusercontent.com/${REPO_SLUG}/main/${ENABLE_APIS_SCRIPT}"
@@ -147,7 +147,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 if ! command -v gcloud >/dev/null 2>&1; then
   warn "[6/7] Skipping API enablement: gcloud not installed (see Step 3)."
   warn "      Manually enable these APIs in the Cloud Console:"
-  warn "         gmail, drive, docs, sheets, forms, calendar-json, tasks"
+  warn "         gmail, drive, docs, sheets, forms, calendar-json, tasks, slides, chat, meet, people, script"
 elif [[ -x "$REPO_ROOT/$ENABLE_APIS_SCRIPT" ]]; then
   # Cloned-repo mode: run the local copy.
   log "[6/7] Enabling Google APIs on your Cloud project..."
@@ -165,7 +165,7 @@ else
     rm -f "$TMP_ENABLE"
     warn "      Could not fetch enable-apis.sh (repo may be private, or no network)."
     warn "      Manually enable these APIs in the Cloud Console:"
-    warn "         gmail, drive, docs, sheets, forms, calendar-json, tasks"
+    warn "         gmail, drive, docs, sheets, forms, calendar-json, tasks, slides, chat, meet, people, script"
   fi
 fi
 

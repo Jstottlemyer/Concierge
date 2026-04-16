@@ -67,17 +67,18 @@ gws auth setup   # walks through project, consent screen, OAuth client, JSON dow
 
 ```bash
 cd path/to/Concierge/packages/google-workspace
-./build/enable-apis.sh           # 7 APIs: gmail, drive, docs, sheets, forms, calendar, tasks
-# ./build/enable-apis.sh "" all  # all 16 APIs
+./build/enable-apis.sh           # 12 APIs: gmail, sheets, docs, drive, forms, calendar, tasks, slides, chat, meet, people, script
+# ./build/enable-apis.sh "" all  # all 16 APIs (adds admin-reports, classroom, workspaceevents, modelarmor)
 ```
 
 **With `gcloud` only:**
 
 ```bash
 gcloud services enable \
-  gmail.googleapis.com drive.googleapis.com docs.googleapis.com \
-  sheets.googleapis.com forms.googleapis.com calendar-json.googleapis.com \
-  tasks.googleapis.com \
+  gmail.googleapis.com sheets.googleapis.com docs.googleapis.com \
+  drive.googleapis.com forms.googleapis.com calendar-json.googleapis.com \
+  tasks.googleapis.com slides.googleapis.com chat.googleapis.com \
+  meet.googleapis.com people.googleapis.com script.googleapis.com \
   --project YOUR_PROJECT_ID
 ```
 
@@ -90,7 +91,7 @@ https://console.cloud.google.com/apis/library/<api>.googleapis.com?project=YOUR_
 ### 5. Authenticate
 
 ```bash
-gws auth login --services drive,gmail,docs,sheets,forms,calendar,tasks
+gws auth login --services gmail,sheets,docs,drive,forms,calendar,tasks,slides,chat,meet,people,script
 # --services takes short names; --scopes would expect full URLs (don't confuse them)
 ```
 
