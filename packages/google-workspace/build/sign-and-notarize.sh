@@ -79,8 +79,17 @@ echo "[sign] target: $MCPB"
 WORK="$(mktemp -d -t concierge-sign.XXXXXX)"
 MCPB_TMP=""
 cleanup() {
-  rm -rf "$WORK"
-  [[ -n "$MCPB_TMP" ]] && rm -f "$MCPB_TMP"
+  # IMPORTANT: this runs as an EXIT trap under `set -e`. A bare
+  # `[[ -n "$VAR" ]] && rm ...` form silently poisons the script's
+  # exit code to 1 when the variable is empty (the `[[ ]]` returns 1,
+  # short-circuits the `&&`, and the trap inherits that rc). Use an
+  # `if` block + explicit `return 0` to guarantee the happy-path
+  # success exit code is preserved.
+  rm -rf "$WORK" || true
+  if [[ -n "$MCPB_TMP" ]]; then
+    rm -f "$MCPB_TMP" || true
+  fi
+  return 0
 }
 trap cleanup EXIT
 
