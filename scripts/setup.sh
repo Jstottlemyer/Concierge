@@ -159,15 +159,40 @@ log "[7/7] Verifying auth + APIs..."
 gws auth status || die "gws auth status failed post-setup. Something went wrong."
 log "      verification ok."
 
-# ── 8. Optional: install .mcpb into Claude Desktop ────────────────────────
+# ── 8. Install .mcpb into Claude Desktop ──────────────────────────────────
 
-if [[ -n "$MCPB_PATH" ]]; then
-  if [[ ! -f "$MCPB_PATH" ]]; then
-    die "No file at '$MCPB_PATH' — can't install into Claude Desktop."
+# Auto-detect: if no path given, look in common spots for the most recent
+# Concierge-GoogleWorkspace-*.mcpb the user may have downloaded.
+if [[ -z "$MCPB_PATH" ]]; then
+  for candidate in \
+    "$REPO_ROOT"/Concierge-GoogleWorkspace-*-darwin-arm64.mcpb \
+    "$HOME/Downloads"/Concierge-GoogleWorkspace-*-darwin-arm64.mcpb \
+    "$HOME/Desktop"/Concierge-GoogleWorkspace-*-darwin-arm64.mcpb
+  do
+    if [[ -f "$candidate" ]]; then
+      MCPB_PATH="$candidate"
+      break
+    fi
+  done
+fi
+
+if [[ -n "$MCPB_PATH" && -f "$MCPB_PATH" ]]; then
+  log "[8/8] Found .mcpb: $MCPB_PATH"
+  if ask_yn "      Install into Claude Desktop now?"; then
+    open -a "Claude" "$MCPB_PATH" 2>/dev/null \
+      || warn "could not auto-open Claude; drag $MCPB_PATH into Claude Desktop → Settings → Extensions."
+    log "      install initiated. Follow Claude Desktop's prompts to enable the extension."
   fi
-  log "[8/8] Installing $MCPB_PATH into Claude Desktop..."
-  open -a "Claude" "$MCPB_PATH" 2>/dev/null || warn "could not auto-open Claude; drag $MCPB_PATH into Claude Desktop → Settings → Extensions."
-  log "      done."
+elif [[ -n "$MCPB_PATH" ]]; then
+  warn "[8/8] You passed '$MCPB_PATH' but that file doesn't exist."
+  warn "      Skipping Claude Desktop install. Re-run with a valid path when ready."
+else
+  log "[8/8] No .mcpb detected in ~/Downloads, ~/Desktop, or the repo root."
+  log "      To install the Concierge extension:"
+  log "        (a) obtain the Concierge-GoogleWorkspace-<version>-darwin-arm64.mcpb file,"
+  log "            either from Justin (v1 early users) or a GitHub release (future)"
+  log "        (b) drop it into ~/Downloads and re-run this script, OR"
+  log "            bash scripts/setup.sh /path/to/Concierge-*.mcpb"
 fi
 
 # ── Done ───────────────────────────────────────────────────────────────────
