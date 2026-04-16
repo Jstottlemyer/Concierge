@@ -30,12 +30,22 @@ Concierge runs as a Claude Desktop extension (`.mcpb`). Claude Desktop includes 
 
 ## Step 1 — Install `gws` (one command)
 
+**If you already have Homebrew:**
+
 ```bash
 brew install googleworkspace-cli
 gws --version   # should print "gws 0.22.x"
 ```
 
-This installs the Google Workspace CLI (`googleworkspace/cli`), which Concierge wraps. Homebrew strips the quarantine xattr so you won't hit a Gatekeeper prompt.
+**If you don't have Homebrew** (or you want a one-shot setup):
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Jstottlemyer/Concierge/main/scripts/install-deps.sh)
+```
+
+This script installs Homebrew if missing and then installs `gws`. Safe to re-run — it skips anything already present. Source lives at `scripts/install-deps.sh` in the repo.
+
+Both approaches install the Google Workspace CLI (`googleworkspace/cli`), which Concierge wraps. Homebrew strips the quarantine xattr so you won't hit a Gatekeeper prompt.
 
 ---
 

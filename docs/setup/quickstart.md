@@ -12,7 +12,15 @@ For terminal users who want the condensed recipe. Full prose + troubleshooting:
 
 **Node is NOT required** — Claude Desktop bundles its own Node runtime for MCP extensions.
 
-### 0. Install Homebrew (if you don't have it)
+### 0. One-shot: install Homebrew + gws
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Jstottlemyer/Concierge/main/scripts/install-deps.sh)
+```
+
+Installs Homebrew if missing, then `gws`. Safe to re-run. If you prefer per-step, use 0a + 1 below instead.
+
+### 0a. Install Homebrew (manual alternative to step 0)
 
 ```bash
 brew --version 2>/dev/null || /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -20,7 +28,7 @@ brew --version 2>/dev/null || /bin/bash -c "$(curl -fsSL https://raw.githubuserc
 
 ## Commands
 
-### 1. Install `gws` CLI
+### 1. Install `gws` CLI (skip if step 0 ran)
 
 ```bash
 brew install googleworkspace-cli
