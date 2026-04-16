@@ -2,16 +2,18 @@
 # Concierge — enable the Google Workspace APIs for your Cloud project.
 #
 # Usage:
-#   ./build/enable-apis.sh                 # auto-detect project from ~/.config/gws/client_secret.json
-#   ./build/enable-apis.sh PROJECT_ID      # explicit
-#   ./build/enable-apis.sh PROJECT_ID all  # enable all 16 APIs (default is 7 for startup-CEO set)
+#   ./build/enable-apis.sh                     # auto-detect project from ~/.config/gws/client_secret.json
+#   ./build/enable-apis.sh PROJECT_ID          # explicit project, default 11-API comprehensive personal set
+#   ./build/enable-apis.sh PROJECT_ID all      # enable all 16 APIs (incl. Workspace-admin-only + paid)
+#   ./build/enable-apis.sh PROJECT_ID minimal  # enable the narrow 7-API startup-CEO subset only
 #
 # Requires: gcloud CLI installed + authenticated (`gcloud auth login`)
 
 set -euo pipefail
 
-# Default APIs for the "startup CEO" persona — Gmail + Drive + Docs + Sheets + Forms + Calendar + Tasks
-DEFAULT_APIS=(
+# Narrow "startup CEO" subset — gmail + drive + docs + sheets + forms + calendar + tasks.
+# Kept for users who explicitly want the minimum-consent posture.
+MINIMAL_APIS=(
   gmail.googleapis.com
   drive.googleapis.com
   docs.googleapis.com
@@ -21,18 +23,26 @@ DEFAULT_APIS=(
   tasks.googleapis.com
 )
 
-# Full Concierge surface (includes the 9 services users may opt into later)
-ALL_APIS=(
-  "${DEFAULT_APIS[@]}"
+# Comprehensive personal-account default — minimal + slides/chat/meet/people.
+# Covers Concierge's 40 MCP tools for non-admin users. Excludes APIs that
+# require special account types (Workspace admin, education) or payment.
+DEFAULT_APIS=(
+  "${MINIMAL_APIS[@]}"
+  slides.googleapis.com
   chat.googleapis.com
   meet.googleapis.com
   people.googleapis.com
-  slides.googleapis.com
-  script.googleapis.com
-  admin.googleapis.com           # admin-reports
-  classroom.googleapis.com
-  workspaceevents.googleapis.com
-  modelarmor.googleapis.com
+)
+
+# Full Concierge surface (personal + admin-only + paid/niche). Opt-in via
+# `./build/enable-apis.sh PROJECT_ID all`.
+ALL_APIS=(
+  "${DEFAULT_APIS[@]}"
+  script.googleapis.com           # Apps Script — deferred from default v1
+  admin.googleapis.com            # admin-reports — Workspace admin only
+  classroom.googleapis.com        # education-specific
+  workspaceevents.googleapis.com  # niche
+  modelarmor.googleapis.com       # paid Google Cloud product
 )
 
 need_cmd() {
@@ -66,13 +76,20 @@ if [[ -z "$PROJECT_ID" ]]; then
 fi
 
 # Pick the API list
-if [[ "$MODE" == "all" ]]; then
-  APIS=("${ALL_APIS[@]}")
-  echo "[enable-apis] mode: all (${#APIS[@]} APIs)"
-else
-  APIS=("${DEFAULT_APIS[@]}")
-  echo "[enable-apis] mode: default/startup-CEO (${#APIS[@]} APIs). Use 'all' as second arg for full set."
-fi
+case "$MODE" in
+  all)
+    APIS=("${ALL_APIS[@]}")
+    echo "[enable-apis] mode: all (${#APIS[@]} APIs — personal + admin + paid)"
+    ;;
+  minimal)
+    APIS=("${MINIMAL_APIS[@]}")
+    echo "[enable-apis] mode: minimal (${#APIS[@]} APIs — startup-CEO core set)"
+    ;;
+  *)
+    APIS=("${DEFAULT_APIS[@]}")
+    echo "[enable-apis] mode: default (${#APIS[@]} APIs — comprehensive personal set). Use 'all' for full, 'minimal' for narrow."
+    ;;
+esac
 
 echo "[enable-apis] enabling on project $PROJECT_ID:"
 for api in "${APIS[@]}"; do

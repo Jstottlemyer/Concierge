@@ -25,7 +25,7 @@
 set -euo pipefail
 
 readonly SCRIPT_NAME="setup.sh"
-readonly SERVICES="gmail,sheets,docs,drive,forms,calendar,tasks"
+readonly SERVICES="gmail,sheets,docs,drive,forms,calendar,tasks,slides,chat,meet,people"
 readonly REPO_SLUG="Jstottlemyer/Concierge"
 readonly ENABLE_APIS_SCRIPT="packages/google-workspace/build/enable-apis.sh"
 readonly ENABLE_APIS_RAW_URL="https://raw.githubusercontent.com/${REPO_SLUG}/main/${ENABLE_APIS_SCRIPT}"
