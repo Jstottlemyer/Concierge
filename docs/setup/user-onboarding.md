@@ -144,10 +144,10 @@ The first login grants Concierge (via `gws`) access to Google. `gws` caches the 
 gws auth login --services drive,gmail
 ```
 
-For the "startup CEO" default you'll probably want the full set immediately:
+For the personal-account default you'll probably want the full set immediately:
 
 ```bash
-gws auth login --services drive,gmail,docs,sheets,forms,calendar,tasks
+gws auth login --services gmail,sheets,docs,drive,forms,calendar,tasks,slides,chat,meet,people,script
 ```
 
 > ⚠️ Use `--services` (accepts service short-names like `drive,gmail,calendar`), NOT `--scopes` (which expects full scope URLs like `https://www.googleapis.com/auth/drive`). Mixing these up produces `Error 400: invalid_scope` with the message *"Some requested scopes were invalid"*.
@@ -183,8 +183,8 @@ You can do this before OR after Step 4 (OAuth login) — the only hard rule is t
 
 ```bash
 cd path/to/Concierge/packages/google-workspace
-./build/enable-apis.sh              # 7 defaults: Gmail, Drive, Docs, Sheets, Forms, Calendar, Tasks
-./build/enable-apis.sh "" all       # all 16 APIs (full Concierge surface)
+./build/enable-apis.sh              # 12 defaults: Gmail, Sheets, Docs, Drive, Forms, Calendar, Tasks, Slides, Chat, Meet, People, Apps Script
+./build/enable-apis.sh "" all       # all 16 APIs (adds Admin Reports, Classroom, Workspace Events, Model Armor)
 ./build/enable-apis.sh PROJECT_ID   # explicit project override
 ```
 
@@ -195,12 +195,17 @@ The script auto-detects your Project ID from `~/.config/gws/client_secret.json`,
 ```bash
 gcloud services enable \
   gmail.googleapis.com \
-  drive.googleapis.com \
-  docs.googleapis.com \
   sheets.googleapis.com \
+  docs.googleapis.com \
+  drive.googleapis.com \
   forms.googleapis.com \
   calendar-json.googleapis.com \
   tasks.googleapis.com \
+  slides.googleapis.com \
+  chat.googleapis.com \
+  meet.googleapis.com \
+  people.googleapis.com \
+  script.googleapis.com \
   --project YOUR_PROJECT_ID
 ```
 
@@ -210,19 +215,24 @@ gcloud services enable \
 https://console.cloud.google.com/apis/library/<api>.googleapis.com?project=YOUR_PROJECT_ID
 ```
 
-Replace `YOUR_PROJECT_ID` with your real Project ID. The seven defaults for a startup-CEO profile:
+Replace `YOUR_PROJECT_ID` with your real Project ID. The twelve defaults for a personal-account profile:
 
 - [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
-- [Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
-- [Docs API](https://console.cloud.google.com/apis/library/docs.googleapis.com)
 - [Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com)
+- [Docs API](https://console.cloud.google.com/apis/library/docs.googleapis.com)
+- [Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
 - [Forms API](https://console.cloud.google.com/apis/library/forms.googleapis.com)
 - [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
 - [Tasks API](https://console.cloud.google.com/apis/library/tasks.googleapis.com)
+- [Slides API](https://console.cloud.google.com/apis/library/slides.googleapis.com)
+- [Chat API](https://console.cloud.google.com/apis/library/chat.googleapis.com)
+- [Meet API](https://console.cloud.google.com/apis/library/meet.googleapis.com)
+- [People API](https://console.cloud.google.com/apis/library/people.googleapis.com)
+- [Apps Script API](https://console.cloud.google.com/apis/library/script.googleapis.com)
 
-Optional — enable as you need them:
+Optional — admin / edu / paid — enable only if your account type supports them:
 
-- Chat · Meet · People · Slides · Apps Script · Admin Reports · Classroom · Workspace Events · Model Armor
+- Admin Reports · Classroom · Workspace Events · Model Armor
 
 **Gotcha:** enabled APIs take ~30 seconds to propagate. If Concierge errors with `api_not_enabled` right after you enable an API, wait a moment and retry.
 
@@ -412,8 +422,8 @@ Give them this summary:
 - [ ] Configure OAuth consent screen (External, add self as Test user)
 - [ ] Create OAuth client (Desktop app type); save JSON or copy ID + secret
 - [ ] Write `~/.config/gws/client_secret.json` with the real Project ID in `project_id`
-- [ ] Enable the 7 Workspace APIs for your project (Gmail, Drive, Docs, Sheets, Forms, Calendar, Tasks) — via `enable-apis.sh`, `gcloud services enable`, or Console
-- [ ] `gws auth login --services drive,gmail,docs,sheets,forms,calendar,tasks`
+- [ ] Enable the 12 Workspace APIs for your project (Gmail, Sheets, Docs, Drive, Forms, Calendar, Tasks, Slides, Chat, Meet, People, Apps Script) — via `enable-apis.sh`, `gcloud services enable`, or Console
+- [ ] `gws auth login --services gmail,sheets,docs,drive,forms,calendar,tasks,slides,chat,meet,people,script`
 - [ ] `gws auth status` — confirm `token_valid: true` and correct `project_id`
 - [ ] `gws drive files list --params '{"pageSize":3}'` — end-to-end verify
 - [ ] Install `.mcpb` in Claude Desktop
