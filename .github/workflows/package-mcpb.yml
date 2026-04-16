@@ -1,9 +1,9 @@
 # Release packaging — builds per-arch `.mcpb` bundles on tag push.
 #
-# Fires only on vendor-specific tags `google-workspace-vX.Y.Z` (preferred) or
-# legacy `vX.Y.Z` tags (backwards compat with the pre-monorepo convention).
-# The hybrid matrix lives here (not in ci.yml) because `.mcpb` assembly needs
-# the actual darwin `gws` binary bundled in.
+# Fires on vendor-specific tags `google-workspace-vX.Y.Z` and release candidates
+# `google-workspace-vX.Y.Z-rcN`. Legacy `vX.Y.Z` tags were removed 2026-04-15
+# because they bypassed the signing gate. `workflow_dispatch` runs produce
+# UNSIGNED test builds only (`workflow_artifact` tier, not release assets).
 #
 # Ordering:
 #   1. Re-run the full ubuntu CI suite (lint / typecheck / test / build)
@@ -11,11 +11,17 @@
 #   2. Two macOS packaging jobs in parallel (arm64 on macos-14, x64 on
 #      macos-13). Each fetches + sha256-verifies the pinned gws binary,
 #      stages it alongside dist/, and zips to a `.mcpb` release asset.
+#   3. arm64 only: Developer ID codesign + hardened runtime + Apple
+#      notarization via App Store Connect API key. Unsigned bits never
+#      leak — signing failure scraps all artifacts for that run.
+#   4. arm64 only: SLSA build-provenance attestation published alongside
+#      the signed .mcpb so downstream verifiers can run `gh attestation
+#      verify <file> --repo Jstottlemyer/Concierge`.
 #
 # Spec refs:
 #   - docs/vendors/google-workspace/spec.md §Distribution AC §29–31
 #   - docs/vendors/google-workspace/plan.md Decision #11 (binary integrity)
-#   - docs/vendors/google-workspace/plan.md T19, T34 (release engineering)
+#   - docs/specs/ci-signing-automation/{spec,plan,check}.md (CI signing flow)
 name: package-mcpb
 
 on:
@@ -33,10 +39,16 @@ on:
         default: 'main'
 
 permissions:
-  contents: write  # release upload
+  contents: write       # release upload
+  id-token: write       # SLSA build-provenance attestation (D2)
+  attestations: write   # SLSA build-provenance attestation (D2)
 
+# Series-wide concurrency (not per-ref) so parallel `-rc1` / `-rc2` / `vX.Y.Z`
+# pushes serialize at the notary queue, not collide. `cancel-in-progress:
+# false` lets every `-rcN` finish so its notary log is available for
+# debugging. See docs/specs/ci-signing-automation/plan.md C5.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-google-workspace
   cancel-in-progress: false
 
 env:
@@ -156,13 +168,12 @@ jobs:
         run: |
           set -euo pipefail
           TAG_NAME="${GITHUB_REF_NAME}"
-          # Accept both 'google-workspace-v1.2.3' and 'v1.2.3' tag forms.
+          # Only 'google-workspace-vX.Y.Z' and '-rcN' variants trigger signing.
           if [[ "$TAG_NAME" == google-workspace-v* ]]; then
             VERSION="${TAG_NAME#google-workspace-v}"
-          elif [[ "$TAG_NAME" == v* ]]; then
-            VERSION="${TAG_NAME#v}"
           else
-            # workflow_dispatch path — fall back to manifest version.
+            # workflow_dispatch path — fall back to manifest version; result
+            # will be an UNSIGNED test build.
             VERSION="$(node -e "console.log(JSON.parse(require('fs').readFileSync('${PKG_DIR}/manifest.json','utf8')).version)")"
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
@@ -186,6 +197,185 @@ jobs:
           echo "OUT=$OUT" >> "$GITHUB_ENV"
           echo "produced: ${OUT}"
 
+      # ─────────────────────────────────────────────────────────────────────
+      # Signing + notarization (C6 → E2 per plan.md).
+      #
+      # Only runs on version tags — workflow_dispatch branch pushes produce
+      # unsigned test builds (no secrets in scope).
+      # ─────────────────────────────────────────────────────────────────────
+
+      - name: Version integrity check (manifest.json vs tag)
+        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          MANIFEST_VERSION="$(jq -r .version ${PKG_DIR}/manifest.json)"
+          # Strip any '-rcN' suffix from the tag before comparing with manifest.
+          TAG_VERSION="${GITHUB_REF_NAME#google-workspace-v}"
+          TAG_CORE_VERSION="${TAG_VERSION%-rc*}"
+          if [[ "$MANIFEST_VERSION" != "$TAG_CORE_VERSION" ]]; then
+            echo "::error title=Version mismatch::manifest.json says '$MANIFEST_VERSION' but tag says '$TAG_CORE_VERSION'. Bump manifest.json and retag."
+            exit 1
+          fi
+          echo "version integrity ok: manifest=$MANIFEST_VERSION tag=$TAG_VERSION"
+
+      - name: Install coreutils (for gtimeout in signer)
+        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        run: brew install coreutils
+
+      - name: Create ephemeral signing keychain
+        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        env:
+          P12_B64:  ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          P12_PASS: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Per-run keychain name prevents collision on hypothetical runner reuse.
+          KEYCHAIN="$RUNNER_TEMP/concierge-signing-${{ github.run_id }}.keychain-db"
+          KEYCHAIN_PASS="$(openssl rand -hex 32)"
+          echo "CONCIERGE_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
+          security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain    -p "$KEYCHAIN_PASS" "$KEYCHAIN"
+
+          # Decode p12 to tmpfs, import with -A (grant all apps on this
+          # ephemeral keychain — runner is single-tenant one-shot).
+          P12_PATH="$RUNNER_TEMP/concierge-devid.p12"
+          echo "$P12_B64" | base64 -d > "$P12_PATH"
+          security import "$P12_PATH" -k "$KEYCHAIN" -P "$P12_PASS" -A -T /usr/bin/codesign
+          rm -f "$P12_PATH"
+
+          # Make the keychain the default + first in search path.
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed -e 's/"//g' | xargs)
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN"
+
+      - name: Post-import sanity check (D6 — catches partition-list zero-but-no-effect)
+        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! security find-identity -v -p codesigning "$CONCIERGE_KEYCHAIN" | grep -q "Developer ID Application"; then
+            echo "::error title=Developer ID identity not visible::security import apparently succeeded but the identity isn't reachable via find-identity. Check -T ACL and partition-list interaction."
+            security find-identity -v -p codesigning "$CONCIERGE_KEYCHAIN"
+            exit 1
+          fi
+          echo "Developer ID Application identity visible and reachable."
+
+      - name: Store notarytool API-key profile
+        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        env:
+          API_KEY:   ${{ secrets.NOTARY_API_KEY_P8 }}
+          KEY_ID:    ${{ secrets.NOTARY_API_KEY_ID }}
+          ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$API_KEY" > "$KEY_PATH"
+          # --keychain pins the profile to our ephemeral keychain so the Sign
+          # step sees it (default login keychain may not be in search path).
+          xcrun notarytool store-credentials concierge-notarize \
+            --keychain "$CONCIERGE_KEYCHAIN" \
+            --key "$KEY_PATH" \
+            --key-id "$KEY_ID" \
+            --issuer "$ISSUER_ID"
+          rm -f "$KEY_PATH"
+
+      - name: Sign + notarize .mcpb
+        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        env:
+          CONCIERGE_SIGNING_IDENTITY: "Developer ID Application: JUSTIN HAYES STOTTLEMYER (${{ secrets.APPLE_TEAM_ID }})"
+          CONCIERGE_TEAM_ID:          ${{ secrets.APPLE_TEAM_ID }}
+          CONCIERGE_NOTARY_PROFILE:   concierge-notarize
+        shell: bash
+        run: |
+          set -euo pipefail
+          ${PKG_DIR}/build/sign-and-notarize.sh "$GITHUB_WORKSPACE/${OUT}"
+
+      - name: Assert codesign chain of trust (E1 per plan.md)
+        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORK="$(mktemp -d)"
+          cd "$WORK"
+          unzip -q "$GITHUB_WORKSPACE/${OUT}"
+          OUT_CS="$(codesign -dvv bin/gws 2>&1)"
+          echo "$OUT_CS"
+          echo "$OUT_CS" | grep -qE "Authority=Developer ID Application.*${{ secrets.APPLE_TEAM_ID }}" \
+            || { echo "::error::codesign Authority does not contain Developer ID Application + team ID"; exit 1; }
+          echo "$OUT_CS" | grep -q "flags=0x10000(runtime)" \
+            || { echo "::error::hardened runtime flag not set"; exit 1; }
+          echo "$OUT_CS" | grep -q "TeamIdentifier=${{ secrets.APPLE_TEAM_ID }}" \
+            || { echo "::error::TeamIdentifier mismatch"; exit 1; }
+          if echo "$OUT_CS" | grep -q "Signature=adhoc"; then
+            echo "::error::artifact has adhoc signature (not Developer ID)"; exit 1
+          fi
+          echo "codesign chain-of-trust assertions passed."
+
+      - name: Assert notarization Accepted (E2 per plan.md)
+        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          # sign-and-notarize.sh exits 0 only if Apple returned Accepted; this
+          # step is a belt-and-suspenders check that queries the API directly
+          # against the most recent submission for our Team ID.
+          SUB_ID="$(xcrun notarytool history \
+            --keychain "$CONCIERGE_KEYCHAIN" \
+            --keychain-profile concierge-notarize \
+            --output-format json \
+            | jq -r '.history[0].id')"
+          STATUS="$(xcrun notarytool info "$SUB_ID" \
+            --keychain "$CONCIERGE_KEYCHAIN" \
+            --keychain-profile concierge-notarize \
+            --output-format json \
+            | jq -r '.status')"
+          echo "submission $SUB_ID status: $STATUS"
+          if [[ "$STATUS" != "Accepted" ]]; then
+            echo "::error::notarization status '$STATUS' (expected 'Accepted')"
+            xcrun notarytool log "$SUB_ID" \
+              --keychain "$CONCIERGE_KEYCHAIN" \
+              --keychain-profile concierge-notarize || true
+            exit 1
+          fi
+
+      - name: Compute SHA-256 of signed .mcpb (for release body)
+        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHA="$(shasum -a 256 "$GITHUB_WORKSPACE/${OUT}" | awk '{print $1}')"
+          echo "MCPB_SHA256=$SHA" >> "$GITHUB_ENV"
+          echo "signed artifact sha256: $SHA"
+
+      - name: SLSA build-provenance attestation (D2 per plan.md)
+        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2
+        with:
+          subject-path: ${{ env.OUT }}
+
+      - name: Destroy ephemeral keychain
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          if [[ -n "${CONCIERGE_KEYCHAIN:-}" && -f "$CONCIERGE_KEYCHAIN" ]]; then
+            security delete-keychain "$CONCIERGE_KEYCHAIN"
+            if security list-keychains -d user | grep -q "$CONCIERGE_KEYCHAIN"; then
+              echo "::warning::keychain cleanup silently failed — entry still in search path"
+            else
+              echo "ephemeral keychain destroyed cleanly."
+            fi
+          fi
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Upload + release attach — intentionally AFTER signing so failed-sign
+      # runs scrap every artifact (Q5 per plan.md C3).
+      # ─────────────────────────────────────────────────────────────────────
+
       - name: Upload as workflow artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
@@ -193,12 +383,42 @@ jobs:
           path: ${{ env.OUT }}
           if-no-files-found: error
 
-      - name: Attach to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Attach to GitHub Release (draft)
+        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
         with:
           files: ${{ env.OUT }}
           draft: true
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          name: Google Workspace v${{ env.VERSION }}
+          body: |
+            ## Concierge — Google Workspace ${{ env.VERSION }}
+
+            **Signed:** Developer ID Application — Team `${{ secrets.APPLE_TEAM_ID }}`
+            **Notarized:** Apple (see SLSA attestation below)
+            **Hardened runtime:** yes
+            **SHA-256:** `${{ env.MCPB_SHA256 }}`
+
+            ### Install
+            1. Download `${{ env.OUT }}`.
+            2. Double-click; Claude Desktop opens the extension installer.
+            3. Follow `docs/setup/quickstart.md` for first-run OAuth.
+
+            ### Verify (optional, for security-conscious installers)
+
+            ```sh
+            # Hash integrity:
+            shasum -a 256 ${{ env.OUT }}
+            # expected: ${{ env.MCPB_SHA256 }}
+
+            # Developer ID signature + notarization:
+            unzip -p ${{ env.OUT }} bin/gws > /tmp/gws
+            codesign -dvv /tmp/gws 2>&1 | grep Authority
+            # expected: Authority=Developer ID Application: JUSTIN HAYES STOTTLEMYER (${{ secrets.APPLE_TEAM_ID }})
+
+            # SLSA build provenance (requires gh CLI ≥ 2.49):
+            gh attestation verify ${{ env.OUT }} --repo ${{ github.repository }}
+            ```
 
   package-darwin-x64:
     name: package darwin-x64 (.mcpb)
@@ -276,8 +496,6 @@ jobs:
           TAG_NAME="${GITHUB_REF_NAME}"
           if [[ "$TAG_NAME" == google-workspace-v* ]]; then
             VERSION="${TAG_NAME#google-workspace-v}"
-          elif [[ "$TAG_NAME" == v* ]]; then
-            VERSION="${TAG_NAME#v}"
           else
             VERSION="$(node -e "console.log(JSON.parse(require('fs').readFileSync('${PKG_DIR}/manifest.json','utf8')).version)")"
           fi
@@ -293,24 +511,29 @@ jobs:
           [[ -f ${PKG_DIR}/LICENSE.gws ]] && cp ${PKG_DIR}/LICENSE.gws "$stage/"  || true
           [[ -f ${PKG_DIR}/NOTICE.gws ]]  && cp ${PKG_DIR}/NOTICE.gws  "$stage/"  || true
 
-      - name: Zip to .mcpb
+      - name: Zip to .mcpb (UNSIGNED — x64 signing lights up when a target user emerges)
         shell: bash
         run: |
           set -euo pipefail
           OUT="Concierge-GoogleWorkspace-${VERSION}-${ARCH}.mcpb"
           (cd ${PKG_DIR}/.mcpb-staging && zip -qr "${GITHUB_WORKSPACE}/${OUT}" .)
           echo "OUT=$OUT" >> "$GITHUB_ENV"
-          echo "produced: ${OUT}"
+          echo "produced: ${OUT}  (unsigned — x64 release attach disabled per plan.md C4)"
 
-      - name: Upload as workflow artifact
+      - name: Upload as workflow artifact (drift detection only)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: ${{ env.OUT }}
           path: ${{ env.OUT }}
           if-no-files-found: error
 
+      # C4: x64 release attach DISABLED until x64 signing is implemented. The
+      # workflow artifact above is kept as a drift-detection signal (Intel build
+      # still compiles) but never surfaces to end users. Re-enable only when x64
+      # signing + notarization path is in place — guarded by the same tag
+      # pattern arm64 uses.
       - name: Attach to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: false
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
         with:
           files: ${{ env.OUT }}

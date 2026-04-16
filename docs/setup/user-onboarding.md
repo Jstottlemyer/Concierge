@@ -240,6 +240,31 @@ Or drag the `.mcpb` file into **Claude Desktop → Settings → Extensions**.
 
 > **For v1 early users:** the repo ([github.com/Jstottlemyer/Concierge](https://github.com/Jstottlemyer/Concierge)) is currently private, so you'll receive the `.mcpb` file directly from Justin rather than from GitHub Releases. Save it somewhere you can find it (e.g. `~/Downloads`) and run the command above pointing at that path.
 
+### Verifying your download (optional, for security-conscious installers)
+
+Releases from `google-workspace-v0.2.0` onward are **signed** with Developer ID Application and **notarized** by Apple. Three independent checks you can run against the `.mcpb` before installing — every release body also includes the same three recipes pre-filled for that version:
+
+```bash
+# 1. File-hash integrity — confirms the bytes match what was published
+shasum -a 256 Concierge-GoogleWorkspace-<version>-darwin-arm64.mcpb
+# compare against the 'SHA-256' line in the GitHub release body
+
+# 2. Developer ID signature on the bundled gws binary — confirms tamper evidence
+unzip -p Concierge-GoogleWorkspace-<version>-darwin-arm64.mcpb bin/gws > /tmp/gws
+codesign -dvv /tmp/gws 2>&1 | grep Authority
+# expected:
+#   Authority=Developer ID Application: JUSTIN HAYES STOTTLEMYER (P5FDYS88B7)
+#   Authority=Developer ID Certification Authority
+#   Authority=Apple Root CA
+
+# 3. SLSA build-provenance attestation — confirms CI actually produced it
+gh attestation verify Concierge-GoogleWorkspace-<version>-darwin-arm64.mcpb \
+  --repo Jstottlemyer/Concierge
+# (requires gh CLI 2.49+)
+```
+
+If all three pass, your copy is byte-identical to what CI produced and signed for that tag. v0.1.0 was a pre-CI release and only has #2 — the SLSA attestation (#3) starts with v0.2.0.
+
 Claude Desktop unpacks the extension to `~/Library/Application Support/Claude/Claude Extensions/local.mcpb.justin-stottlemyer.concierge-google-workspace/`.
 
 Because `gws` is already authenticated, Concierge inherits your credentials transparently — no additional consent needed. Ask Claude:
