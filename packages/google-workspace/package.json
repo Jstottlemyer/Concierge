@@ -1,6 +1,6 @@
 {
   "name": "@concierge/google-workspace",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Concierge vendor package for Google Workspace — .mcpb MCP server wrapping googleworkspace/cli.",
   "type": "module",

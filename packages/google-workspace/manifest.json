@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "concierge-google-workspace",
   "display_name": "Concierge — Google Workspace",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Your local concierge for Google Workspace inside Claude Desktop — wraps the googleworkspace/cli binary to send Gmail, upload to Drive, create Docs/Sheets/Slides/Forms, manage Tasks/Chat/Meet/Keep/Classroom/Apps Script, audit Admin reports. 42 typed tools. Strictly local — data never leaves your Mac.",
   "long_description": "Concierge is a Claude Desktop extension that brings Google Workspace into Claude Desktop via the open-source googleworkspace/cli (gws). Unlike claude.ai's hosted Google connectors (Gmail/Calendar/Drive), Concierge runs entirely on your Mac: your own Google Cloud project owns the OAuth credentials, the bundled gws binary handles API calls, and credentials live in your macOS Keychain. Complementary to the hosted connectors — Concierge focuses on send/write/create actions and the 10 services native connectors don't cover (Docs, Sheets, Slides, Forms, Tasks, Chat, Meet, Keep, Classroom, Admin Reports, Apps Script).",
   "author": {
