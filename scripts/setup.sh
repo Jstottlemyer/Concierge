@@ -49,47 +49,9 @@ ask_yn() {
   [[ "$answer_lc" == "y" || "$answer_lc" == "yes" ]]
 }
 
-print_manual_cloud_console_steps() {
-  cat >&2 <<'EOM'
-
-  ═════════════════════════════════════════════════════════════════════════
-  MANUAL ROUTE — Cloud Console browser flow
-  ═════════════════════════════════════════════════════════════════════════
-
-  1. Open the Google Cloud Console:
-       https://console.cloud.google.com/
-
-  2. Create a new project (top-left dropdown → "New Project").
-     Name: anything you'll recognize (e.g., "concierge-gws").
-
-  3. Configure the OAuth consent screen:
-       https://console.cloud.google.com/apis/credentials/consent
-     - User type: "External"
-     - App name, support email, developer contact: fill in
-     - Publishing status: leave as "Testing"
-     - Add your own email as a Test User
-
-  4. Create an OAuth client:
-       https://console.cloud.google.com/apis/credentials
-     - Click "+ CREATE CREDENTIALS" → "OAuth client ID"
-     - Application type: "Desktop app"
-     - Name: "Concierge"
-     - Click CREATE → DOWNLOAD JSON (save the file)
-
-  5. Place the downloaded JSON at the path gws expects:
-       mkdir -p ~/.config/gws
-       mv ~/Downloads/client_secret_*.json ~/.config/gws/client_secret.json
-
-  6. Come back and re-run this script:
-       bash scripts/setup.sh
-     It will detect the client_secret.json and continue from Step 5
-     (gws auth login).
-
-  Full walkthrough with screenshots: docs/setup/user-onboarding.md Step 2
-  ═════════════════════════════════════════════════════════════════════════
-
-EOM
-}
+# (The opinionated flow assumes gcloud; the old "manual Cloud Console" branch
+# was dropped 2026-04-16 to reduce decision fatigue. Users who genuinely want
+# the browser route can follow docs/setup/user-onboarding.md Step 2 manually.)
 
 # ── 0. Platform guard ──────────────────────────────────────────────────────
 
@@ -139,42 +101,16 @@ if command -v gcloud >/dev/null 2>&1; then
     fi
   fi
 else
-  log "[3/7] gcloud not installed."
-  cat >&2 <<'EOM'
-
-  Step 4 creates a Google Cloud project and an OAuth client. Two paths:
-
-  (a) AUTOMATED — install gcloud now (~1 min brew install + auth login)
-      Then 'gws auth setup' walks through project / consent screen / OAuth
-      client / client_secret.json download in one interactive command.
-
-  (b) MANUAL — skip gcloud, do the Cloud Console clicks yourself
-      ~10 min browser flow. Script prints exact URLs + instructions, then
-      exits. Re-run once client_secret.json is in place.
-
-EOM
-  printf '[%s] Pick a path: (a) install gcloud, (b) manual browser flow, (q) quit [a/b/q] ' "$SCRIPT_NAME" >&2
-  read -r gcloud_choice
-  case "$(lc "$gcloud_choice")" in
-    a|auto|automated|yes|y)
-      log "      Installing google-cloud-sdk via Homebrew..."
-      brew install --cask google-cloud-sdk
-      log "      Running 'gcloud auth login' (browser will open)..."
-      gcloud auth login
-      ;;
-    b|manual)
-      print_manual_cloud_console_steps
-      exit 0
-      ;;
-    q|quit|"")
-      warn "      aborted. Re-run when ready."
-      exit 0
-      ;;
-    *)
-      warn "      unrecognized response '$gcloud_choice'; treating as quit."
-      exit 0
-      ;;
-  esac
+  log "[3/7] gcloud not installed — needed for the automated project + OAuth flow."
+  log "      Will install google-cloud-sdk via Homebrew (~1 min) then run 'gcloud auth login'."
+  if ! ask_yn "Proceed?"; then
+    warn "      aborted. Re-run when ready."
+    exit 0
+  fi
+  log "      Installing google-cloud-sdk via Homebrew..."
+  brew install --cask google-cloud-sdk
+  log "      Running 'gcloud auth login' (browser will open)..."
+  gcloud auth login
 fi
 
 # ── 4. Cloud project + OAuth client + client_secret.json ──────────────────
@@ -184,22 +120,11 @@ CLIENT_SECRET="${HOME}/.config/gws/client_secret.json"
 if [[ -f "$CLIENT_SECRET" ]]; then
   log "[4/7] client_secret.json already present at $CLIENT_SECRET"
 else
-  log "[4/7] No client_secret.json yet."
-  if command -v gcloud >/dev/null 2>&1 && gcloud auth print-access-token >/dev/null 2>&1; then
-    warn "      With gcloud authenticated, 'gws auth setup' walks through:"
-    warn "         project creation → OAuth consent screen → OAuth client → JSON download"
-    if ask_yn "Run 'gws auth setup' now?"; then
-      gws auth setup || die "gws auth setup failed. See docs/setup/user-onboarding.md Step 2 for manual recovery."
-    else
-      warn "      Skipping — see docs/setup/user-onboarding.md Step 2 for manual Cloud Console flow."
-      warn "      Re-run this script once ~/.config/gws/client_secret.json exists."
-      exit 0
-    fi
-  else
-    warn "      Without gcloud authenticated, this step is a browser flow."
-    print_manual_cloud_console_steps
-    exit 0
+  log "[4/7] No client_secret.json — running 'gws auth setup' to create project + OAuth client."
+  if ! command -v gcloud >/dev/null 2>&1 || ! gcloud auth print-access-token >/dev/null 2>&1; then
+    die "      gcloud isn't installed or authenticated; Step 3 should have handled this. Re-run the script."
   fi
+  gws auth setup || die "gws auth setup failed. See docs/setup/user-onboarding.md Step 2 for manual recovery."
 fi
 
 # ── 5. gws auth login ──────────────────────────────────────────────────────
