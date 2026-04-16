@@ -26,7 +26,9 @@ set -euo pipefail
 
 readonly SCRIPT_NAME="setup.sh"
 readonly SERVICES="gmail,sheets,docs,drive,forms,calendar,tasks"
+readonly REPO_SLUG="Jstottlemyer/Concierge"
 readonly ENABLE_APIS_SCRIPT="packages/google-workspace/build/enable-apis.sh"
+readonly ENABLE_APIS_RAW_URL="https://raw.githubusercontent.com/${REPO_SLUG}/main/${ENABLE_APIS_SCRIPT}"
 
 MCPB_PATH="${1:-}"
 
@@ -142,15 +144,29 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-if [[ -x "$REPO_ROOT/$ENABLE_APIS_SCRIPT" ]] && command -v gcloud >/dev/null 2>&1; then
-  log "[6/7] Enabling Google APIs on your Cloud project..."
-  (cd "$REPO_ROOT" && bash "$ENABLE_APIS_SCRIPT") || warn "enable-apis.sh failed — you may need to enable manually in the Cloud Console."
-else
-  warn "[6/7] Skipping API enablement:"
-  [[ ! -x "$REPO_ROOT/$ENABLE_APIS_SCRIPT" ]] && warn "       (enable-apis.sh not found at $ENABLE_APIS_SCRIPT — running from curl-pipe?)"
-  command -v gcloud >/dev/null 2>&1 || warn "       (gcloud not installed — see step 3)"
+if ! command -v gcloud >/dev/null 2>&1; then
+  warn "[6/7] Skipping API enablement: gcloud not installed (see Step 3)."
   warn "      Manually enable these APIs in the Cloud Console:"
   warn "         gmail, drive, docs, sheets, forms, calendar-json, tasks"
+elif [[ -x "$REPO_ROOT/$ENABLE_APIS_SCRIPT" ]]; then
+  # Cloned-repo mode: run the local copy.
+  log "[6/7] Enabling Google APIs on your Cloud project..."
+  (cd "$REPO_ROOT" && bash "$ENABLE_APIS_SCRIPT") \
+    || warn "enable-apis.sh failed — you may need to enable manually in the Cloud Console."
+else
+  # Curl-pipe mode (no local repo): fetch enable-apis.sh from the public repo.
+  log "[6/7] Enabling Google APIs (fetching helper from GitHub raw)..."
+  TMP_ENABLE="$(mktemp)"
+  if curl -fsSL "$ENABLE_APIS_RAW_URL" -o "$TMP_ENABLE" 2>/dev/null && [[ -s "$TMP_ENABLE" ]]; then
+    bash "$TMP_ENABLE" \
+      || warn "enable-apis.sh failed — you may need to enable manually in the Cloud Console."
+    rm -f "$TMP_ENABLE"
+  else
+    rm -f "$TMP_ENABLE"
+    warn "      Could not fetch enable-apis.sh (repo may be private, or no network)."
+    warn "      Manually enable these APIs in the Cloud Console:"
+    warn "         gmail, drive, docs, sheets, forms, calendar-json, tasks"
+  fi
 fi
 
 # ── 7. Verify ──────────────────────────────────────────────────────────────
@@ -169,7 +185,6 @@ log "      verification ok."
 # Step 3 requires the repo to be PUBLIC. On a private repo the GitHub API
 # returns 404 unauth, and we fall back to printing where to get the file.
 
-readonly REPO_SLUG="Jstottlemyer/Concierge"
 readonly GH_API="https://api.github.com/repos/${REPO_SLUG}"
 
 # 8a. Auto-detect locally if no explicit path
