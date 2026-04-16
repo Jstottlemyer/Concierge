@@ -12,13 +12,15 @@ For terminal users who want the condensed recipe. Full prose + troubleshooting:
 
 **Node is NOT required** — Claude Desktop bundles its own Node runtime for MCP extensions.
 
-### 0. One-shot: install Homebrew + gws
+### 0. One-shot: full setup (recommended)
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/Jstottlemyer/Concierge/main/scripts/install-deps.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/Jstottlemyer/Concierge/main/scripts/setup.sh)
 ```
 
-Installs Homebrew if missing, then `gws`. Safe to re-run. If you prefer per-step, use 0a + 1 below instead.
+Walks Steps 1-5 end-to-end: Homebrew, gws, gcloud, OAuth project + client, `gws auth login`, API enablement, verify. Skips anything already done. If you have a `.mcpb` file, pass its path as `$1` to also install into Claude Desktop.
+
+Everything below is the manual per-step breakdown for users who prefer explicit control.
 
 ### 0a. Install Homebrew (manual alternative to step 0)
 
