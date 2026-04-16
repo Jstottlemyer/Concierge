@@ -1,0 +1,16 @@
+# gitleaks allowlist — intentional test fixtures with obvious fake markers.
+#
+# Each line is `commit-sha:file:rule:start-line`. These entries pin fake
+# JWTs / OAuth access-token strings used by the log-scan redaction tests
+# (`packages/google-workspace/src/log/redact.ts`) — they prove that Concierge
+# strips real-looking tokens from subprocess output. Every secret here
+# contains an obvious fake marker: `FAKE_SIG`, `SIGNATURE_HERE_`, or
+# `abcd.efgh.ijkl`.
+#
+# If you add a new fake fixture, run `gitleaks detect --verbose` and append
+# the fingerprint here. DO NOT add real tokens to this allowlist.
+
+d6504c7530428098be1139a38f49b27d59dbca50:packages/google-workspace/tests/fixtures/log-scan/positive-tokens.txt:jwt:4
+d6504c7530428098be1139a38f49b27d59dbca50:packages/google-workspace/tests/log/redact-real-tokens.test.ts:generic-api-key:24
+d6504c7530428098be1139a38f49b27d59dbca50:packages/google-workspace/tests/log/redact-real-tokens.test.ts:jwt:21
+d6504c7530428098be1139a38f49b27d59dbca50:packages/google-workspace/tests/fixtures/log-scan/sample-session-transcript.txt:jwt:86
