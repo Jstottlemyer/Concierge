@@ -33,12 +33,62 @@ MCPB_PATH="${1:-}"
 log()    { printf '[%s] %s\n' "$SCRIPT_NAME" "$*"; }
 warn()   { printf '[%s] ⚠  %s\n' "$SCRIPT_NAME" "$*" >&2; }
 die()    { printf '[%s] ✖  %s\n' "$SCRIPT_NAME" "$*" >&2; exit 1; }
+lc() {
+  # Lowercase a string — POSIX alternative to bash 4's ${var,,} which
+  # macOS's default bash 3.2 doesn't support.
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
 ask_yn() {
   # ask_yn "prompt"  → returns 0 for yes, 1 for no
   local prompt="$1" answer
   printf '[%s] %s [y/N] ' "$SCRIPT_NAME" "$prompt" >&2
   read -r answer
-  [[ "${answer,,}" == "y" || "${answer,,}" == "yes" ]]
+  local answer_lc
+  answer_lc="$(lc "$answer")"
+  [[ "$answer_lc" == "y" || "$answer_lc" == "yes" ]]
+}
+
+print_manual_cloud_console_steps() {
+  cat >&2 <<'EOM'
+
+  ═════════════════════════════════════════════════════════════════════════
+  MANUAL ROUTE — Cloud Console browser flow
+  ═════════════════════════════════════════════════════════════════════════
+
+  1. Open the Google Cloud Console:
+       https://console.cloud.google.com/
+
+  2. Create a new project (top-left dropdown → "New Project").
+     Name: anything you'll recognize (e.g., "concierge-gws").
+
+  3. Configure the OAuth consent screen:
+       https://console.cloud.google.com/apis/credentials/consent
+     - User type: "External"
+     - App name, support email, developer contact: fill in
+     - Publishing status: leave as "Testing"
+     - Add your own email as a Test User
+
+  4. Create an OAuth client:
+       https://console.cloud.google.com/apis/credentials
+     - Click "+ CREATE CREDENTIALS" → "OAuth client ID"
+     - Application type: "Desktop app"
+     - Name: "Concierge"
+     - Click CREATE → DOWNLOAD JSON (save the file)
+
+  5. Place the downloaded JSON at the path gws expects:
+       mkdir -p ~/.config/gws
+       mv ~/Downloads/client_secret_*.json ~/.config/gws/client_secret.json
+
+  6. Come back and re-run this script:
+       bash scripts/setup.sh
+     It will detect the client_secret.json and continue from Step 5
+     (gws auth login).
+
+  Full walkthrough with screenshots: docs/setup/user-onboarding.md Step 2
+  ═════════════════════════════════════════════════════════════════════════
+
+EOM
 }
 
 # ── 0. Platform guard ──────────────────────────────────────────────────────
@@ -90,12 +140,41 @@ if command -v gcloud >/dev/null 2>&1; then
   fi
 else
   log "[3/7] gcloud not installed."
-  warn "      Without gcloud, Step 4 (Cloud project + OAuth) becomes a manual browser flow."
-  warn "      With gcloud, 'gws auth setup' does Steps 2+3+4 automatically in one command."
-  if ask_yn "Install gcloud via Homebrew now?"; then
-    brew install --cask google-cloud-sdk
-    gcloud auth login
-  fi
+  cat >&2 <<'EOM'
+
+  Step 4 creates a Google Cloud project and an OAuth client. Two paths:
+
+  (a) AUTOMATED — install gcloud now (~1 min brew install + auth login)
+      Then 'gws auth setup' walks through project / consent screen / OAuth
+      client / client_secret.json download in one interactive command.
+
+  (b) MANUAL — skip gcloud, do the Cloud Console clicks yourself
+      ~10 min browser flow. Script prints exact URLs + instructions, then
+      exits. Re-run once client_secret.json is in place.
+
+EOM
+  printf '[%s] Pick a path: (a) install gcloud, (b) manual browser flow, (q) quit [a/b/q] ' "$SCRIPT_NAME" >&2
+  read -r gcloud_choice
+  case "$(lc "$gcloud_choice")" in
+    a|auto|automated|yes|y)
+      log "      Installing google-cloud-sdk via Homebrew..."
+      brew install --cask google-cloud-sdk
+      log "      Running 'gcloud auth login' (browser will open)..."
+      gcloud auth login
+      ;;
+    b|manual)
+      print_manual_cloud_console_steps
+      exit 0
+      ;;
+    q|quit|"")
+      warn "      aborted. Re-run when ready."
+      exit 0
+      ;;
+    *)
+      warn "      unrecognized response '$gcloud_choice'; treating as quit."
+      exit 0
+      ;;
+  esac
 fi
 
 # ── 4. Cloud project + OAuth client + client_secret.json ──────────────────
@@ -117,12 +196,8 @@ else
       exit 0
     fi
   else
-    warn "      Without gcloud, this step is a browser flow. Follow:"
-    warn "         https://console.cloud.google.com/  (create project + OAuth client)"
-    warn "      Then download the OAuth client JSON and save to:"
-    warn "         $CLIENT_SECRET"
-    warn "      Full walkthrough: docs/setup/user-onboarding.md Step 2."
-    warn "      Re-run this script once client_secret.json is in place."
+    warn "      Without gcloud authenticated, this step is a browser flow."
+    print_manual_cloud_console_steps
     exit 0
   fi
 fi
