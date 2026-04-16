@@ -351,8 +351,15 @@ jobs:
           echo "MCPB_SHA256=$SHA" >> "$GITHUB_ENV"
           echo "signed artifact sha256: $SHA"
 
+      # D2 (SLSA attestation) — actions/attest-build-provenance is NOT
+      # available on user-owned private repos (only orgs / public repos).
+      # `continue-on-error` so the step attempts + logs warning without
+      # blocking the release. When the repo flips public, this starts
+      # producing real attestations automatically — no workflow change
+      # needed. See docs/specs/ci-signing-automation/plan.md D2.
       - name: SLSA build-provenance attestation (D2 per plan.md)
         if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        continue-on-error: true
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2
         with:
           subject-path: ${{ env.OUT }}
@@ -420,9 +427,14 @@ jobs:
             gh attestation verify ${{ env.OUT }} --repo ${{ github.repository }}
             ```
 
+  # x64 job disabled 2026-04-16 — `macos-13-us-default` is deprecated on the
+  # free tier ("The configuration 'macos-13-us-default' is not supported").
+  # Re-enable with `runs-on: macos-13` (paid) or migrate to macos-14 Rosetta
+  # when x64 signing lights up in the backlog.
   package-darwin-x64:
     name: package darwin-x64 (.mcpb)
     needs: lint-test-build
+    if: false
     runs-on: macos-13  # Intel
     timeout-minutes: 20
     env:
