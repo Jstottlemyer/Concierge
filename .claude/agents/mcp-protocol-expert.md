@@ -10,21 +10,38 @@ Ensure MCP servers correctly implement the protocol, expose tools/resources/prom
 
 ## Checklist
 
+### Protocol & Transport
 - **Transport** — stdio for local desktop integration (default); HTTP/SSE only with justification
-- **Initialization** — correct `initialize` handshake, capability advertisement matches reality
+- **Initialization** — correct `initialize` handshake; capability advertisement matches reality
+- **Capability negotiation** — server honors the client's declared capabilities
+- **Detection:** check the `initialize` response — advertised capabilities must match actual handlers. Run the server with `echo '{"jsonrpc":"2.0","id":1,"method":"initialize",...}' | <server>` and verify response. Look for HTTP/SSE transport without a local-only justification.
+
+### Tool & Resource Design
 - **Tool schemas** — JSON Schema valid, descriptions specific, required/optional fields explicit
 - **Tool naming** — stable, namespaced, no collisions with other servers
 - **Resources** — URIs canonical, MIME types correct, pagination for large lists
 - **Prompts** — argument schemas, clear descriptions, deterministic output
-- **Error responses** — structured errors with `code` + `message`; no stack traces leaked
-- **Auth handoff** — how does the MCP server obtain credentials? Keychain read at startup vs per-call
+- **Detection:** validate tool schemas with a JSON Schema linter. Grep tool names across installed MCP servers for collisions. Check `description` fields — vague descriptions ("run a command") cause Claude to mis-pick.
+
+### Schema Stability
+- **Versioning** — changes to tool schemas bump the server version; client can detect breaking changes
+- **Detection:** diff current tool schemas vs. prior release; any removed field / required-field addition / type change is breaking. Confirm server reports a version bump.
+
+### Lifecycle & Concurrency
 - **Process lifecycle** — clean startup, clean shutdown on SIGTERM, no orphaned children
-- **Logging** — to stderr only (stdout is protocol); structured; no secrets
-- **Schema stability** — changes to tool schemas bumped in server version; client can detect
 - **Concurrency** — request handlers safe under parallel invocation; token refresh race-free
-- **Capability negotiation** — server honors client's declared capabilities
 - **Resource limits** — bounded memory/time per tool call; timeouts documented
+- **Detection:** send SIGTERM while a tool call is in flight — confirm clean exit, no zombie children (`ps`). Run 10 parallel tool calls — look for shared-state corruption or duplicate token refresh. Check for unbounded loops / missing timeouts.
+
+### Auth & Secrets
+- **Auth handoff** — how does the MCP server obtain credentials? Keychain read at startup vs per-call (document tradeoff)
+- **Logging** — to stderr only (stdout is protocol); structured; no secrets
+- **Detection:** grep server code for `console.log`, `print`, `sys.stdout.write` — anything to stdout breaks the protocol. Grep log output for token/password values. Verify auth fetch is scoped to minimal lifetime.
+
+### Errors & Distribution
+- **Error responses** — structured errors with `code` + `message`; no stack traces leaked
 - **Install/manifest** — Claude Desktop config example provided; env vars documented
+- **Detection:** force an error path — verify response shape matches MCP spec (no leaking `error.stack` or internal paths). Check README for a copy-paste `claude_desktop_config.json` snippet.
 
 ## Key Questions
 

@@ -62,6 +62,7 @@ Rules specific to this codebase. Apply in addition to user-level `~/CLAUDE.md`.
 
 - `brew install coreutils` is required before running `CONCIERGE_SIGN=1 ./build/pack.sh`. The signer caps the notary wait at 1800s via `gtimeout`; without it the fallback branch warns and has no upper bound on the wait.
 - macOS ships bash 3.2. Avoid `"${empty_array[@]}"` under `set -u` — it errors as "unbound variable". Branch on `${#arr[@]}` or use the `${arr[@]+"${arr[@]}"}` idiom instead.
+- **Bash EXIT traps can silently poison the script's exit code under `set -e`.** If the trap's final executed command returns non-zero, that rc propagates as the script's exit — even after `SUCCESS` was printed. Specifically: `[[ -n "$VAR" ]] && cmd` where VAR is empty returns 1, short-circuits `cmd`, trap returns 1. Use an `if` block + explicit `return 0` in EXIT traps. Bit us during v0.2.0-rc1 signing (fix: commit `10eaf27`).
 
 ## Target persona
 

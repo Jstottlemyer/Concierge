@@ -59,7 +59,11 @@ Concierge uses OAuth 2.0, which requires a Google Cloud project that owns an OAu
 gws auth setup
 ```
 
-This walks you through project selection/creation, enables the Workspace APIs, configures the consent screen, creates an OAuth client, and downloads the client secret. Skip to Step 4 when it finishes.
+On the happy path this walks you through project selection/creation, enables the Workspace APIs, configures the consent screen, creates an OAuth client, and downloads the client secret. Skip to Step 4 when it finishes.
+
+**If it prompts you for a Project ID** and rejects your first try with *"Project ID already in use globally"*: don't use `concierge`, `workspace`, or other short generic names — GCP Project IDs are globally unique across all of GCP and the obvious ones were claimed years ago. Personalize it: `concierge-<yourlastname>` or `concierge-<company>-<YYYY>`. The display name (what you'll see in the Console UI later) is a separate field and can be anything — only the Project ID needs to be unique.
+
+**If it stops and asks you to create the OAuth client yourself**: this is expected. `gws` cannot create a Desktop-type OAuth client automatically because Google has never shipped a `gcloud` API for that. You are not stuck — jump into Path B below at substep **B.2** (consent screen) and continue through **B.4** (OAuth client) and **Step 3** (write `client_secret.json`). The project that `gws auth setup` just created is reusable, so skip **B.1** — but note its Project ID from [Cloud Console → Project info](https://console.cloud.google.com/home/dashboard); you'll paste it into `client_secret.json` in Step 3.
 
 ### Path B: manual via Google Cloud Console (no `gcloud` needed)
 
