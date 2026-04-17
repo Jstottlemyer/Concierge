@@ -126,7 +126,7 @@ else
   if ! command -v gcloud >/dev/null 2>&1 || ! gcloud auth print-access-token >/dev/null 2>&1; then
     die "      gcloud isn't installed or authenticated; Step 3 should have handled this. Re-run the script."
   fi
-  gws auth setup || die "gws auth setup failed. See docs/setup/user-onboarding.md Step 2 for manual recovery."
+  gws auth setup || die "gws auth setup did not complete. Two common causes: (1) the Project ID you typed is globally taken — retry with a personalized ID like 'concierge-<yourlastname>'; (2) gws asked you to create the OAuth client in the Cloud Console — that's expected, continue at docs/setup/user-onboarding.md Step 2 Path A (the 'If it stops and asks you to create the OAuth client yourself' subsection). Full manual recovery path: docs/setup/user-onboarding.md Step 2 Path B."
 fi
 
 # ── 5. gws auth login ──────────────────────────────────────────────────────

@@ -52,6 +52,9 @@ gcloud auth login
 gws auth setup   # walks through project, consent screen, OAuth client, JSON download
 ```
 
+- When prompted for a Project ID, personalize it (e.g. `concierge-<yourlastname>`). `concierge` alone — and other short generic names — are globally taken.
+- If `gws auth setup` punts OAuth client creation back to you, that's expected — jump into the **Without `gcloud`** checklist below at step 2 (consent screen) and continue from there. The project is already created.
+
 **Without `gcloud`** (Console checklist — copy your real **Project ID** from the Project info card, not the Project Number):
 
 1. https://console.cloud.google.com → create project → copy **Project ID** (e.g. `my-concierge-abc-123456`)

@@ -26,6 +26,16 @@ Short index. Most real recovery content lives in:
    ```
 3. Retry. No OAuth re-auth needed — `project_id` is metadata, not credential material.
 
+## "Project ID already in use" at `gws auth setup` prompt
+
+**What it means:** GCP Project IDs are globally unique across all of GCP (not per-account) — `concierge`, `workspace`, and other short/generic names were claimed years ago. When `gws auth setup` prompts you for a Project ID and you type one that's already taken, Google rejects the submission with this error.
+
+**Fix:** retype with a personal suffix — `concierge-<yourlastname>` or `concierge-<company>-<YYYY>`. The display name (shown in the Cloud Console UI) is a separate field and can be anything; only the Project ID string must be globally unique.
+
+**Not the same as** the `"Project 'projects/<x>' not found or deleted"` error above. That one happens downstream, after a wrong `project_id` lands in `~/.config/gws/client_secret.json` and every API call fails. This one is the upstream CLI prompt collision — before any `client_secret.json` exists.
+
+See also: [`docs/setup/user-onboarding.md` Step 2 Path A](setup/user-onboarding.md#path-a-automated-via-gws-auth-setup-requires-gcloud) for the prompt-survival guidance.
+
 ## Quick map: error code → where to look
 
 | Error code | Where to go |
