@@ -98,3 +98,12 @@ v1 primary user: startup CEO (PashionFootwear). Gmail + Sheets + Forms are the h
 ## Docs are dual-format
 
 - Every end-user setup flow ships in two docs: a prose version (`docs/setup/user-onboarding.md`) with context + troubleshooting, and a terminal recipe (`docs/setup/quickstart.md`) with minimal prose. Keep both in sync when changing setup steps.
+
+## graphify
+
+This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- After modifying code files in this session, run `command -v graphify >/dev/null && graphify update .` to keep the graph current (AST-only, no API cost; no-ops cleanly if graphify isn't installed)
