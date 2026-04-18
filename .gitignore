@@ -61,6 +61,7 @@ Icon
 .parcel-cache/
 .eslintcache
 .turbo/
+graphify-out/cache/
 
 # Claude / local scratch
 .claude/settings.local.json

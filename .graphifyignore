@@ -1,0 +1,16 @@
+# Node / pnpm
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Test output
+coverage/
+
+# Built MCP bundles (binary, not source)
+*.mcpb
+
+# Standard
+graphify-out/
+.venv/
+.DS_Store
