@@ -66,9 +66,9 @@ export const USER_FACING_MESSAGES: Record<ErrorCode, UserFacingMessage> = {
   },
   account_revoked: {
     summary:
-      "{account} has had its access revoked — Google is rejecting the stored credential. That can happen if you removed the app from your Google Account or changed your password.",
+      "There's no authenticated Google account, or the stored credential was rejected. That happens on first use, after removing the app from your Google Account, or after changing your password.",
     next_action:
-      "Ask me to re-authenticate {account}, or remove it and add a fresh account.",
+      "Run the command shown in `copyable_command` to (re-)authenticate, then retry.",
   },
   validation_error: {
     summary:

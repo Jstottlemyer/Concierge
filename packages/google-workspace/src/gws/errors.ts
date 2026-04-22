@@ -13,6 +13,13 @@
 //     5  internal gws error           → gws_error
 //    -1  runner-side timeout / abort  → network_error + retry_after_ms:1000
 //
+// Note on exit 2: gws emits this for BOTH "no credentials stored yet" and
+// "credentials present but rejected by Google." We can't distinguish without
+// an extra `gws auth status` probe (deferred to docs/specs/auth-probe/), so
+// the user-facing message and copyable command cover both cases. This is why
+// `list_accounts` can return [] while a tool call returns `account_revoked` —
+// they're consistent reads of the same exit-2 state, not contradictions.
+//
 // Before exit-code translation, stderr is scanned for Google Cloud API
 // enablement signatures. When detected, we emit `api_not_enabled` with a
 // direct one-click enable URL for the specific API, bypassing the generic
@@ -33,6 +40,16 @@ export const STDERR_TAIL_BYTES = 500;
 
 /** Retry hint for timeout-derived envelopes (ms). */
 export const TIMEOUT_RETRY_AFTER_MS = 1000;
+
+/**
+ * Default `gws auth login` command suggested when exit 2 fires. Covers the
+ * five highest-frequency Workspace services (productivity bundle minus the
+ * less-common forms/tasks). The user can edit before running — this is just
+ * a paste-ready starting point. Kept short to avoid encouraging users to
+ * grant scopes they don't need.
+ */
+export const REAUTH_COPYABLE_COMMAND =
+  'gws auth login --services drive,gmail,docs,sheets,calendar';
 
 /**
  * Map of gws service slug → Google Cloud API service name (the FQDN used in
@@ -233,7 +250,7 @@ export function toolErrorFromGwsResult(result: RunResult): ErrorEnvelope {
     });
   }
 
-  const { code, message, retryAfterMs } = codeFor(result.exitCode);
+  const { code, message, retryAfterMs, copyableCommand } = codeFor(result.exitCode);
 
   return makeError({
     error_code: code,
@@ -242,6 +259,7 @@ export function toolErrorFromGwsResult(result: RunResult): ErrorEnvelope {
     gws_exit_code: result.exitCode,
     gws_stderr: stderrTail,
     ...(retryAfterMs !== undefined ? { retry_after_ms: retryAfterMs } : {}),
+    ...(copyableCommand !== undefined ? { copyable_command: copyableCommand } : {}),
   });
 }
 
@@ -249,6 +267,7 @@ interface Mapping {
   readonly code: ErrorCode;
   readonly message: string;
   readonly retryAfterMs?: number;
+  readonly copyableCommand?: string;
 }
 
 /**
@@ -270,7 +289,10 @@ function codeFor(exitCode: number): Mapping {
     case 2:
       return {
         code: 'account_revoked',
-        message: 'gws reports the account credentials are missing or revoked.',
+        message:
+          'No authenticated Google account, or the stored token was rejected. ' +
+          'Run the command in `copyable_command` to (re-)authenticate.',
+        copyableCommand: REAUTH_COPYABLE_COMMAND,
       };
     case 3:
       return {
