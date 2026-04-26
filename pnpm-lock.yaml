@@ -60,6 +60,15 @@ importers:
         specifier: latest
         version: 3.25.2(zod@4.3.6)
 
+  packages/setup:
+    dependencies:
+      '@concierge/core':
+        specifier: workspace:*
+        version: link:../core
+      '@modelcontextprotocol/sdk':
+        specifier: latest
+        version: 1.29.0(zod@4.3.6)
+
 packages:
 
   '@emnapi/core@1.9.2':

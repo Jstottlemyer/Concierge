@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+# Test shim for the `claude` CLI.
+#
+# Used by Concierge orchestrator integration tests (G6) on CI runners that
+# don't have the real Claude Code CLI installed. CI puts this directory on
+# PATH so `claude mcp add ...` invocations from phases/verify.ts hit this
+# shim instead of the real binary.
+#
+# Requirements:
+#   - bash 3.2+ (macOS default).
+#   - jq (preinstalled on macOS / GitHub macos-14 runners).
+#
+# Safety:
+#   - All `mcp` subcommands REQUIRE $CONCIERGE_TEST_CLAUDE_JSON to point at
+#     a tempdir-scoped path. If unset, the shim refuses (exit 2) so a stray
+#     test cannot mutate the developer's real ~/.claude.json.
+
+set -u
+
+require_jq() {
+  command -v jq >/dev/null 2>&1 || {
+    echo "test shim requires jq" >&2
+    exit 127
+  }
+}
+
+require_test_json() {
+  if [[ -z "${CONCIERGE_TEST_CLAUDE_JSON:-}" ]]; then
+    echo 'Error: $CONCIERGE_TEST_CLAUDE_JSON not set; refusing to touch ~/.claude.json.' >&2
+    exit 2
+  fi
+}
+
+# Atomic write: jq-process input -> tmp -> rename. $1 = filter, rest = filter args (--arg/--argjson pairs).
+atomic_jq_write() {
+  local target="$CONCIERGE_TEST_CLAUDE_JSON"
+  local tmp
+  tmp="$(mktemp "${target}.XXXXXX")" || {
+    echo "Error: failed to create tempfile" >&2
+    exit 1
+  }
+  local input
+  if [[ -f "$target" ]]; then
+    input="$target"
+  else
+    # Synthesize empty doc on stdin path.
+    if ! echo '{}' | jq "$@" > "$tmp"; then
+      rm -f "$tmp"
+      exit 1
+    fi
+    mv "$tmp" "$target"
+    return 0
+  fi
+  if ! jq "$@" "$input" > "$tmp"; then
+    rm -f "$tmp"
+    exit 1
+  fi
+  mv "$tmp" "$target"
+}
+
+read_json_or_empty() {
+  if [[ -f "$CONCIERGE_TEST_CLAUDE_JSON" ]]; then
+    cat "$CONCIERGE_TEST_CLAUDE_JSON"
+  else
+    echo '{}'
+  fi
+}
+
+usage_error() {
+  echo "Error: test shim does not implement '$*'." >&2
+  exit 1
+}
+
+# --- argv dispatch -----------------------------------------------------------
+
+if [[ $# -eq 0 ]]; then
+  usage_error ""
+fi
+
+case "$1" in
+  --version)
+    echo "claude 1.0.42 (test shim)"
+    exit 0
+    ;;
+  mcp)
+    shift
+    if [[ $# -eq 0 ]]; then
+      usage_error "mcp"
+    fi
+    sub="$1"
+    shift
+    case "$sub" in
+      add)
+        require_jq
+        require_test_json
+        # Parse: --transport stdio <name> --scope <scope> -- <command> [args...]
+        transport=""
+        name=""
+        scope=""
+        command_=""
+        args_json="[]"
+        # Walk flags until we see a non-flag (the name).
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --transport)
+              transport="${2:-}"
+              shift 2 || usage_error "mcp add (missing --transport value)"
+              ;;
+            --scope)
+              scope="${2:-}"
+              shift 2 || usage_error "mcp add (missing --scope value)"
+              ;;
+            --)
+              shift
+              if [[ $# -eq 0 ]]; then
+                usage_error "mcp add (missing command after --)"
+              fi
+              command_="$1"
+              shift
+              # Collect remaining as args.
+              if [[ $# -gt 0 ]]; then
+                args_json="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
+              fi
+              break
+              ;;
+            -*)
+              usage_error "mcp add (unknown flag $1)"
+              ;;
+            *)
+              if [[ -z "$name" ]]; then
+                name="$1"
+                shift
+              else
+                usage_error "mcp add (unexpected positional $1)"
+              fi
+              ;;
+          esac
+        done
+
+        if [[ -z "$transport" || -z "$name" || -z "$scope" || -z "$command_" ]]; then
+          usage_error "mcp add (missing required fields)"
+        fi
+
+        # Check for existing key.
+        existing="$(read_json_or_empty | jq --arg n "$name" '.mcpServers[$n] // empty')"
+        if [[ -n "$existing" ]]; then
+          echo "Error: server '$name' already registered. Use 'claude mcp remove $name' first." >&2
+          exit 1
+        fi
+
+        # Build entry and merge atomically.
+        atomic_jq_write \
+          --arg name "$name" \
+          --arg transport "$transport" \
+          --arg command "$command_" \
+          --arg scope "$scope" \
+          --argjson args "$args_json" \
+          '. as $root
+           | ($root.mcpServers // {}) as $servers
+           | .mcpServers = ($servers + {($name): {
+               "type": $transport,
+               "command": $command,
+               "args": $args,
+               "scope": $scope
+             }})'
+        exit 0
+        ;;
+      remove)
+        require_jq
+        require_test_json
+        if [[ $# -ne 1 ]]; then
+          usage_error "mcp remove (expected exactly one name)"
+        fi
+        name="$1"
+        existing="$(read_json_or_empty | jq --arg n "$name" '.mcpServers[$n] // empty')"
+        if [[ -z "$existing" ]]; then
+          echo "Error: server '$name' not registered." >&2
+          exit 1
+        fi
+        atomic_jq_write \
+          --arg name "$name" \
+          '. as $root
+           | ($root.mcpServers // {}) as $servers
+           | .mcpServers = ($servers | del(.[$name]))'
+        exit 0
+        ;;
+      list)
+        require_jq
+        require_test_json
+        read_json_or_empty | jq -r '.mcpServers // {} | keys[]?'
+        exit 0
+        ;;
+      *)
+        usage_error "mcp $sub $*"
+        ;;
+    esac
+    ;;
+  *)
+    usage_error "$*"
+    ;;
+esac

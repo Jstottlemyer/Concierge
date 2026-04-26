@@ -37,6 +37,36 @@ on:
         description: 'Tag or ref to package (workflow_dispatch runs are UNSIGNED test builds only; signing is tag-push-only).'
         required: true
         default: 'main'
+  # F0 (setup-hardening-v2): expose this workflow as a reusable component so the
+  # coordinated `release-v*.*.*` workflow (F1) can fan out package-mcpb as a
+  # sub-job, then run package-setup on top with the produced .mcpb in hand.
+  # Behavior on the existing tag-trigger path is unchanged — when invoked via
+  # `workflow_call`, the caller passes `version` (and optionally a `release-tag`
+  # to attach the artifact to a different release than the tag that triggered
+  # the build, e.g. `release-v0.3.0` instead of `google-workspace-v0.3.0`).
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version string baked into the artifact filename (e.g. "0.3.0"). Required when caller is not a google-workspace-v* tag push.'
+        required: true
+        type: string
+      arch:
+        description: 'Target arch slug. Currently only darwin-arm64 is signed; kept for future cross-arch support.'
+        required: false
+        type: string
+        default: 'darwin-arm64'
+      release-tag:
+        description: 'If set, the signed artifact is attached to this GitHub Release tag (e.g. "release-v0.3.0") instead of the tag that triggered the build. Enables coordinated release-v* tags to publish the .mcpb under themselves.'
+        required: false
+        type: string
+        default: ''
+    outputs:
+      mcpb-path:
+        description: 'Filename of the produced .mcpb artifact in the runner workspace root (caller can re-download via actions/download-artifact using this name).'
+        value: ${{ jobs.package-darwin-arm64.outputs.mcpb-path }}
+      mcpb-sha256:
+        description: 'SHA-256 of the produced (signed, when applicable) .mcpb artifact.'
+        value: ${{ jobs.package-darwin-arm64.outputs.mcpb-sha256 }}
 
 permissions:
   contents: write       # release upload
@@ -98,6 +128,9 @@ jobs:
     needs: lint-test-build
     runs-on: macos-14  # Apple Silicon
     timeout-minutes: 20
+    outputs:
+      mcpb-path:   ${{ steps.artifact-meta.outputs.mcpb-path }}
+      mcpb-sha256: ${{ steps.artifact-meta.outputs.mcpb-sha256 }}
     env:
       ARCH: darwin-arm64
       # Mirrors build/pack.sh asset naming: aarch64 for arm64 macs.
@@ -106,6 +139,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      # Unified signing-trigger gate. The original tag-pattern check
+      # (`startsWith(github.ref, 'refs/tags/google-workspace-v')`) is
+      # preserved for tag pushes; when invoked via `workflow_call`, the
+      # caller's `release-tag` input (e.g. `release-v0.3.0`) opts the
+      # build into the same signing path. workflow_dispatch keeps producing
+      # unsigned test builds (no inputs.release-tag, no matching ref).
+      - name: Decide whether to sign
+        id: sign-gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" == refs/tags/google-workspace-v* ]] \
+             || [[ -n "${{ inputs.release-tag }}" ]]; then
+            echo "should_sign=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "should_sign=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
@@ -165,11 +216,19 @@ jobs:
 
       - name: Assemble .mcpb staging directory
         shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           TAG_NAME="${GITHUB_REF_NAME}"
-          # Only 'google-workspace-vX.Y.Z' and '-rcN' variants trigger signing.
-          if [[ "$TAG_NAME" == google-workspace-v* ]]; then
+          # Precedence: workflow_call `inputs.version` (F0/F1 path) > tag-strip
+          # > manifest fallback. Tag-trigger path is unchanged: when the build
+          # is started by `git push --tags google-workspace-vX.Y.Z`, INPUT_VERSION
+          # is empty and we fall through to the original tag-strip logic, which
+          # produces the same VERSION as before.
+          if [[ -n "${INPUT_VERSION}" ]]; then
+            VERSION="${INPUT_VERSION}"
+          elif [[ "$TAG_NAME" == google-workspace-v* ]]; then
             VERSION="${TAG_NAME#google-workspace-v}"
           else
             # workflow_dispatch path — fall back to manifest version; result
@@ -205,26 +264,36 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
 
       - name: Version integrity check (manifest.json vs tag)
-        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        if: steps.sign-gate.outputs.should_sign == 'true'
         shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           MANIFEST_VERSION="$(jq -r .version ${PKG_DIR}/manifest.json)"
-          # Strip any '-rcN' suffix from the tag before comparing with manifest.
-          TAG_VERSION="${GITHUB_REF_NAME#google-workspace-v}"
+          # When called via workflow_call (F0/F1 path), GITHUB_REF_NAME is the
+          # caller's tag (e.g. `release-v0.3.0`), not a `google-workspace-v*`
+          # tag — fall back to the explicit `version` input. Tag-trigger path
+          # behaves exactly as before (INPUT_VERSION is empty).
+          if [[ -n "${INPUT_VERSION}" ]]; then
+            TAG_VERSION="${INPUT_VERSION}"
+          else
+            TAG_VERSION="${GITHUB_REF_NAME#google-workspace-v}"
+          fi
+          # Strip any '-rcN' suffix before comparing with manifest.
           TAG_CORE_VERSION="${TAG_VERSION%-rc*}"
           if [[ "$MANIFEST_VERSION" != "$TAG_CORE_VERSION" ]]; then
-            echo "::error title=Version mismatch::manifest.json says '$MANIFEST_VERSION' but tag says '$TAG_CORE_VERSION'. Bump manifest.json and retag."
+            echo "::error title=Version mismatch::manifest.json says '$MANIFEST_VERSION' but version says '$TAG_CORE_VERSION'. Bump manifest.json and retag."
             exit 1
           fi
-          echo "version integrity ok: manifest=$MANIFEST_VERSION tag=$TAG_VERSION"
+          echo "version integrity ok: manifest=$MANIFEST_VERSION version=$TAG_VERSION"
 
       - name: Install coreutils (for gtimeout in signer)
-        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        if: steps.sign-gate.outputs.should_sign == 'true'
         run: brew install coreutils
 
       - name: Create ephemeral signing keychain
-        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        if: steps.sign-gate.outputs.should_sign == 'true'
         env:
           P12_B64:  ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
           P12_PASS: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
@@ -252,7 +321,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN"
 
       - name: Post-import sanity check (D6 — catches partition-list zero-but-no-effect)
-        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        if: steps.sign-gate.outputs.should_sign == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -264,7 +333,7 @@ jobs:
           echo "Developer ID Application identity visible and reachable."
 
       - name: Store notarytool API-key profile
-        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        if: steps.sign-gate.outputs.should_sign == 'true'
         env:
           API_KEY:   ${{ secrets.NOTARY_API_KEY_P8 }}
           KEY_ID:    ${{ secrets.NOTARY_API_KEY_ID }}
@@ -284,7 +353,7 @@ jobs:
           rm -f "$KEY_PATH"
 
       - name: Sign + notarize .mcpb
-        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        if: steps.sign-gate.outputs.should_sign == 'true'
         env:
           CONCIERGE_SIGNING_IDENTITY: "Developer ID Application: JUSTIN HAYES STOTTLEMYER (${{ secrets.APPLE_TEAM_ID }})"
           CONCIERGE_TEAM_ID:          ${{ secrets.APPLE_TEAM_ID }}
@@ -295,7 +364,7 @@ jobs:
           ${PKG_DIR}/build/sign-and-notarize.sh "$GITHUB_WORKSPACE/${OUT}"
 
       - name: Assert codesign chain of trust (E1 per plan.md)
-        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        if: steps.sign-gate.outputs.should_sign == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -316,7 +385,7 @@ jobs:
           echo "codesign chain-of-trust assertions passed."
 
       - name: Assert notarization Accepted (E2 per plan.md)
-        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        if: steps.sign-gate.outputs.should_sign == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -343,13 +412,28 @@ jobs:
           fi
 
       - name: Compute SHA-256 of signed .mcpb (for release body)
-        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        if: steps.sign-gate.outputs.should_sign == 'true'
         shell: bash
         run: |
           set -euo pipefail
           SHA="$(shasum -a 256 "$GITHUB_WORKSPACE/${OUT}" | awk '{print $1}')"
           echo "MCPB_SHA256=$SHA" >> "$GITHUB_ENV"
           echo "signed artifact sha256: $SHA"
+
+      # Job outputs for `workflow_call` consumers (F1 release.yml).
+      # Computed unconditionally so dispatch/test runs still expose the path
+      # to debugging tooling; SHA is computed here too as a backstop for
+      # unsigned dispatch builds where MCPB_SHA256 wasn't set above.
+      - name: Expose artifact metadata to workflow_call outputs
+        id: artifact-meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${MCPB_SHA256:-}" ]]; then
+            MCPB_SHA256="$(shasum -a 256 "$GITHUB_WORKSPACE/${OUT}" | awk '{print $1}')"
+          fi
+          echo "mcpb-path=${OUT}"          >> "$GITHUB_OUTPUT"
+          echo "mcpb-sha256=${MCPB_SHA256}" >> "$GITHUB_OUTPUT"
 
       # D2 (SLSA attestation) — actions/attest-build-provenance is NOT
       # available on user-owned private repos (only orgs / public repos).
@@ -358,7 +442,7 @@ jobs:
       # producing real attestations automatically — no workflow change
       # needed. See docs/specs/ci-signing-automation/plan.md D2.
       - name: SLSA build-provenance attestation (D2 per plan.md)
-        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        if: steps.sign-gate.outputs.should_sign == 'true'
         continue-on-error: true
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2
         with:
@@ -391,12 +475,18 @@ jobs:
           if-no-files-found: error
 
       - name: Attach to GitHub Release (draft)
-        if: startsWith(github.ref, 'refs/tags/google-workspace-v')
+        if: steps.sign-gate.outputs.should_sign == 'true'
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
         with:
           files: ${{ env.OUT }}
+          # When called via workflow_call from the coordinated `release-v*`
+          # workflow (F1), attach the .mcpb to the caller's release tag instead
+          # of the (nonexistent) `google-workspace-v*` tag. Empty string falls
+          # back to action default = github.ref tag, preserving tag-trigger
+          # behavior unchanged.
+          tag_name: ${{ inputs.release-tag != '' && inputs.release-tag || github.ref_name }}
           draft: true
-          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          prerelease: ${{ contains(inputs.release-tag != '' && inputs.release-tag || github.ref_name, '-rc') }}
           name: Google Workspace v${{ env.VERSION }}
           body: |
             ## Concierge — Google Workspace ${{ env.VERSION }}
