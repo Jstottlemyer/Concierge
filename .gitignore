@@ -12,6 +12,7 @@ packages/*/build/*
 !packages/*/build/verify-pack.sh
 !packages/*/build/enable-apis.sh
 !packages/*/build/sign-and-notarize.sh
+!packages/*/build/prepare-assets.sh
 *.tsbuildinfo
 
 # MCPB packaging

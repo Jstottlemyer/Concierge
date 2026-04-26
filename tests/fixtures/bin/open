@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Test shim for the macOS `open` command.
+#
+# Used by Concierge claudeRegister.ts tests. Records its argv (one item per
+# line) into $CONCIERGE_TEST_OPEN_LOG so tests can assert correct
+# invocations. Always exits 0 unless $CONCIERGE_TEST_OPEN_EXIT_CODE is set.
+#
+# Safety:
+#   - $CONCIERGE_TEST_OPEN_LOG MUST be set; otherwise the shim refuses
+#     (exit 2) so a stray test cannot accidentally launch Claude.app on
+#     the developer's machine.
+
+set -u
+
+if [[ -z "${CONCIERGE_TEST_OPEN_LOG:-}" ]]; then
+  echo 'Error: $CONCIERGE_TEST_OPEN_LOG not set; refusing to invoke real `open`.' >&2
+  exit 2
+fi
+
+# Append a record. Format: one invocation per "---" delimited block, one
+# argv element per line. Tests parse by splitting on the delimiter.
+{
+  echo "---"
+  for arg in "$@"; do
+    echo "$arg"
+  done
+} >> "$CONCIERGE_TEST_OPEN_LOG"
+
+exit "${CONCIERGE_TEST_OPEN_EXIT_CODE:-0}"
