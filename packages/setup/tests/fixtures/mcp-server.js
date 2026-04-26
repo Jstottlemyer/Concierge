@@ -20,6 +20,8 @@
 // shape as `packages/google-workspace/src/mcp/server.ts`. ~50 lines of
 // behaviour, plus boilerplate.
 
+import { appendFileSync } from 'node:fs';
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -31,6 +33,19 @@ import {
 const mode = process.env.FIXTURE_MODE ?? 'happy';
 const buildId = process.env.FIXTURE_BUILD_ID ?? 'fixture-build-001';
 const buildTime = process.env.FIXTURE_BUILD_TIME ?? '2026-04-25T00:00:00Z';
+
+// Optional invocation counter: when FIXTURE_INVOCATION_LOG is set, each
+// fixture process appends one line on startup. Tests can read the line count
+// to assert how many times the fixture was spawned (e.g. shared-spawn
+// optimization in C6 verify.ts).
+const invocationLog = process.env.FIXTURE_INVOCATION_LOG;
+if (invocationLog !== undefined && invocationLog !== '') {
+  try {
+    appendFileSync(invocationLog, `${process.pid}\n`);
+  } catch {
+    // best-effort; tests will catch the assertion failure instead
+  }
+}
 
 const server = new Server(
   { name: 'concierge-fixture', version: '0.0.0-fixture' },

@@ -127,19 +127,20 @@ function findProbe<T = unknown>(
   return r as ProbeResult<T>;
 }
 
-/** Hide known binaries (brew/node/gcloud/etc.) by pointing PATH at an empty
- *  dir. Useful for "everything missing" tests. The gws shim still needs to
- *  resolve, so we keep the fixtures dir on PATH and route gws via env. */
+/** Hide known binaries (brew/node/gcloud/claude/etc.) by pointing PATH at an
+ *  empty dir. Useful for "everything missing" tests. The gws shim still needs
+ *  to resolve, but it's reachable via $CONCIERGE_TEST_GWS_BIN (absolute path,
+ *  PATH-independent), so we DROP the fixtures dir entirely — otherwise the
+ *  brew/node/claude shims that live there would be found and the probes would
+ *  incorrectly report 'ok' instead of 'missing'. */
 function isolatePath(): void {
   const empty = join(tmp, 'empty-path');
   mkdirSync(empty, { recursive: true });
-  // Keep fixtures dir + /usr/bin + /bin so:
-  //   - claude shim resolves to the test binary
-  //   - the shim's `#!/usr/bin/env bash` can find env + bash
-  //   - the probe orchestrator can still spawn /bin/sh for `command -v` lookups
-  // We drop /usr/local/bin + /opt/homebrew/bin so brew/node/gcloud become
-  // invisible — those are the binaries we want to assert as `missing`.
-  process.env['PATH'] = `${empty}:${FIXTURE_BIN_DIR}:/usr/bin:/bin`;
+  // Drop /usr/local/bin + /opt/homebrew/bin + FIXTURE_BIN_DIR so all
+  // installable tools (brew/node/gcloud/claude) are invisible — those are the
+  // binaries we want to assert as `missing`. /usr/bin + /bin remain so
+  // /bin/sh + builtins still work for `command -v` lookups.
+  process.env['PATH'] = `${empty}:/usr/bin:/bin`;
 }
 
 async function authenticateGws(user = 'test@example.com'): Promise<void> {
@@ -266,9 +267,8 @@ describe('runAllProbes', () => {
     expect(findProbe(results, 'node').status).toBe('missing');
     expect(findProbe(results, 'gcloud').status).toBe('missing');
     expect(findProbe(results, 'gcloud.appDefault').status).toBe('missing');
-    // claude.cli still resolves via fixtures dir on PATH.
-    expect(findProbe(results, 'claude.cli').status).toBe('ok');
-    // gws still routes via env-injected shim, independent of PATH.
+    expect(findProbe(results, 'claude.cli').status).toBe('missing');
+    // gws still routes via env-injected shim (absolute path), independent of PATH.
     expect(findProbe(results, 'gws').status).toBe('ok');
   }, TEST_TIMEOUT_MS);
 

@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# Test shim for the `brew` (Homebrew) binary.
+#
+# Used by Concierge orchestrator unit + integration tests for `phases/install.ts`
+# (C3). The SUT spawns brew to install / upgrade / search Homebrew packages and
+# casks; this shim mimics enough of that surface to drive the install pipeline
+# without ever touching the real Homebrew on the developer's machine.
+#
+# Requirements:
+#   - bash 3.2+ (macOS default).
+#   - No jq required.
+#
+# Safety:
+#   - All `install` / `upgrade` subcommands REQUIRE $CONCIERGE_TEST_BREW_LOG to
+#     point at a tempdir-scoped path. If unset, the shim refuses (exit 2) so a
+#     stray test cannot pretend to install real software.
+#
+# Behaviour controls (all opt-in via env vars):
+#   - CONCIERGE_TEST_BREW_LOG          : append-only log of received argv
+#                                        (one tab-separated record per call).
+#   - CONCIERGE_TEST_BREW_FAIL         : colon-separated package names; if the
+#                                        current install/upgrade target is in
+#                                        this set, exit 1 after emitting a
+#                                        synthetic stderr error.
+#   - CONCIERGE_TEST_BREW_SEARCH_HIT   : colon-separated package names; only
+#                                        these match `brew search <pkg>` (any
+#                                        other lookup returns "No formula or
+#                                        cask found" + exit 1, mirroring real
+#                                        brew's behavior).
+#   - CONCIERGE_TEST_BREW_PROGRESS_LINES : integer count of fake progress lines
+#                                          to emit on stdout during install
+#                                          (default: 3). Each line is flushed
+#                                          immediately so SUT line-streaming
+#                                          tests can observe them.
+#
+# Real-brew parity targets (4.x):
+#   - `brew install <formula>`         : exit 0 with progress on stdout.
+#   - `brew install --cask <cask>`     : same shape, --cask flag tolerated.
+#   - `brew upgrade <formula>`         : exit 0 with progress on stdout.
+#   - `brew search <name>`             : stdout list of matches + exit 0,
+#                                        OR "No formula or cask found" + exit 1.
+#   - `brew --version`                 : `Homebrew 4.x.x (test shim)`.
+
+set -u
+
+require_log() {
+  if [[ -z "${CONCIERGE_TEST_BREW_LOG:-}" ]]; then
+    echo 'Error: $CONCIERGE_TEST_BREW_LOG not set; refusing to pretend to install.' >&2
+    exit 2
+  fi
+}
+
+log_call() {
+  # Format: <ISO-ish ts>\t<argv joined by tab>. Tab-separating argv lets tests
+  # assert exact arg shape (e.g. `install\t--cask\tgoogle-cloud-sdk`) without
+  # ambiguity vs a single space-joined blob.
+  local ts
+  ts="$(date +%Y-%m-%dT%H:%M:%S)"
+  local joined=""
+  local first=1
+  for a in "$@"; do
+    if [[ $first -eq 1 ]]; then
+      joined="$a"
+      first=0
+    else
+      joined="${joined}	${a}"
+    fi
+  done
+  printf '%s\t%s\n' "$ts" "$joined" >> "$CONCIERGE_TEST_BREW_LOG"
+}
+
+# Emit synthetic progress lines, flushing each one. Real brew streams lines
+# like `==> Downloading ...`, `==> Pouring ...`, `🍺 ...` — we mimic the shape
+# closely enough for line-by-line consumers to assert on.
+emit_progress() {
+  local pkg="$1"
+  local kind="${2:-install}" # install or upgrade
+  local n="${CONCIERGE_TEST_BREW_PROGRESS_LINES:-3}"
+  local i=1
+  while [[ $i -le $n ]]; do
+    case $i in
+      1) printf '==> Downloading %s\n' "$pkg" ;;
+      2) printf '==> Pouring %s.bottle.tar.gz\n' "$pkg" ;;
+      3) printf '🍺 /opt/homebrew/Cellar/%s: %d files, fake (test shim)\n' "$pkg" $((i * 10)) ;;
+      *) printf '==> %s step %d for %s\n' "$kind" "$i" "$pkg" ;;
+    esac
+    i=$((i + 1))
+  done
+}
+
+# Returns 0 if needle is in the colon-separated haystack.
+in_csv() {
+  local needle="$1"
+  local hay=":${2:-}:"
+  case "$hay" in
+    *":${needle}:"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+usage_error() {
+  echo "Error: test shim does not implement '$*'." >&2
+  exit 1
+}
+
+# --- argv dispatch -----------------------------------------------------------
+
+if [[ $# -eq 0 ]]; then
+  usage_error ""
+fi
+
+case "$1" in
+  --version)
+    echo "Homebrew 4.5.2 (test shim)"
+    exit 0
+    ;;
+  install|upgrade)
+    action="$1"
+    shift
+    require_log
+    log_call "$action" "$@"
+    # Walk argv: tolerate --cask / --quiet / --formula flags, capture last
+    # non-flag positional as the package name.
+    pkg=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --cask|--formula|--quiet|--no-quarantine)
+          shift
+          ;;
+        -*)
+          # Unknown flag — ignore for shim parity (real brew is permissive).
+          shift
+          ;;
+        *)
+          pkg="$1"
+          shift
+          ;;
+      esac
+    done
+    if [[ -z "$pkg" ]]; then
+      usage_error "$action (no package name)"
+    fi
+    if in_csv "$pkg" "${CONCIERGE_TEST_BREW_FAIL:-}"; then
+      # Synthetic failure shape: a few stdout progress lines, then a stderr
+      # error, then exit 1. Mirrors how real brew reports a failed bottle pour.
+      emit_progress "$pkg" "$action"
+      echo "Error: ${action} failed for ${pkg}: simulated failure (test shim)" >&2
+      exit 1
+    fi
+    emit_progress "$pkg" "$action"
+    exit 0
+    ;;
+  search)
+    shift
+    if [[ $# -eq 0 ]]; then
+      usage_error "search"
+    fi
+    needle="$1"
+    if in_csv "$needle" "${CONCIERGE_TEST_BREW_SEARCH_HIT:-}"; then
+      printf '==> Formulae\n%s\n' "$needle"
+      exit 0
+    fi
+    echo "No formula or cask found for \"$needle\"." >&2
+    exit 1
+    ;;
+  *)
+    usage_error "$*"
+    ;;
+esac
