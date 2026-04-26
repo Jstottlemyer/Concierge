@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Test shim for the macOS `open` command.
 #
 # Used by Concierge claudeRegister.ts tests. Records its argv (one item per

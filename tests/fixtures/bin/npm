@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Test shim for the `npm` binary. Used by Concierge orchestrator tests for
 # `phases/install.ts` (C3) when exercising the npm-fallback path for the
 # `claude` CLI install (when `brew search claude-code` returns nothing).
