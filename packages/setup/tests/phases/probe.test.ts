@@ -136,11 +136,13 @@ function findProbe<T = unknown>(
 function isolatePath(): void {
   const empty = join(tmp, 'empty-path');
   mkdirSync(empty, { recursive: true });
-  // Drop /usr/local/bin + /opt/homebrew/bin + FIXTURE_BIN_DIR so all
+  // Drop /usr/local/bin + /opt/homebrew/bin + /usr/bin + FIXTURE_BIN_DIR so
   // installable tools (brew/node/gcloud/claude) are invisible — those are the
-  // binaries we want to assert as `missing`. /usr/bin + /bin remain so
-  // /bin/sh + builtins still work for `command -v` lookups.
-  process.env['PATH'] = `${empty}:/usr/bin:/bin`;
+  // binaries we want to assert as `missing`. /bin remains so the shims'
+  // `#!/usr/bin/env bash` shebang can resolve bash via /bin/bash. We
+  // specifically EXCLUDE /usr/bin because ubuntu-latest preinstalls gcloud at
+  // /usr/bin/gcloud (snap symlink) and that would leak into the test.
+  process.env['PATH'] = `${empty}:/bin`;
 }
 
 async function authenticateGws(user = 'test@example.com'): Promise<void> {
