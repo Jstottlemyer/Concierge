@@ -1,0 +1,194 @@
+#!/bin/bash
+# Test shim for the `gws` (googleworkspace/cli) binary.
+#
+# Used by Concierge orchestrator integration tests (G6) on CI runners that
+# don't have a real Google account / can't perform a browser OAuth flow. CI
+# puts this directory on PATH ahead of any real gws install so the
+# orchestrator's probe + install + verify flows hit this shim.
+#
+# Requirements:
+#   - bash 3.2+ (macOS default).
+#   - jq (preinstalled on macOS / GitHub macos-14 runners).
+#
+# Safety:
+#   - All write subcommands REQUIRE $CONCIERGE_TEST_GWS_DIR to point at a
+#     tempdir-scoped path. If unset, the shim refuses (exit 2) so a stray
+#     test cannot mutate the developer's real ~/.config/gws.
+#
+# Real-gws parity targets (v0.22.5):
+#   - `gws auth status` returns JSON with shape
+#       { user, scopes, token_valid, encrypted_credentials_exists, project_id }
+#     matching what packages/google-workspace/src/auth/granted-bundles.ts reads.
+#   - Exit 2 from `gws auth status` when no creds exist (orchestrator's
+#     gws/errors.ts treats exit 2 as "not authenticated").
+#   - `gws auth login --services <csv>` matches the service short-name flag
+#     pattern (NOT the buggy --scopes URL form documented in CLAUDE.md).
+
+set -u
+
+require_jq() {
+  command -v jq >/dev/null 2>&1 || {
+    echo "test shim requires jq" >&2
+    exit 127
+  }
+}
+
+require_test_dir() {
+  if [[ -z "${CONCIERGE_TEST_GWS_DIR:-}" ]]; then
+    echo 'Error: $CONCIERGE_TEST_GWS_DIR not set; refusing to touch ~/.config/gws.' >&2
+    exit 2
+  fi
+  if [[ ! -d "$CONCIERGE_TEST_GWS_DIR" ]]; then
+    mkdir -p "$CONCIERGE_TEST_GWS_DIR" || {
+      echo "Error: failed to create $CONCIERGE_TEST_GWS_DIR" >&2
+      exit 1
+    }
+  fi
+}
+
+usage_error() {
+  echo "Error: test shim does not implement '$*'." >&2
+  exit 1
+}
+
+# Productivity bundle scope union — mirrors packages/google-workspace/src/bundles/constants.ts
+# (gmail.modify, drive, calendar, documents, spreadsheets, tasks,
+#  forms.body, forms.responses.readonly).
+DEFAULT_SCOPES_JSON='[
+  "https://www.googleapis.com/auth/gmail.modify",
+  "https://www.googleapis.com/auth/drive",
+  "https://www.googleapis.com/auth/calendar",
+  "https://www.googleapis.com/auth/documents",
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/tasks",
+  "https://www.googleapis.com/auth/forms.body",
+  "https://www.googleapis.com/auth/forms.responses.readonly"
+]'
+
+# --- argv dispatch -----------------------------------------------------------
+
+if [[ $# -eq 0 ]]; then
+  usage_error ""
+fi
+
+case "$1" in
+  --version)
+    echo "gws 0.22.5 (test shim)"
+    exit 0
+    ;;
+  auth)
+    shift
+    if [[ $# -eq 0 ]]; then
+      usage_error "auth"
+    fi
+    sub="$1"
+    shift
+    case "$sub" in
+      setup)
+        require_jq
+        require_test_dir
+        target="$CONCIERGE_TEST_GWS_DIR/client_secret.json"
+        tmp="$(mktemp "${target}.XXXXXX")" || {
+          echo "Error: failed to create tempfile" >&2
+          exit 1
+        }
+        jq -n '{
+          installed: {
+            client_id: "493302-test-shim.apps.googleusercontent.com",
+            client_secret: "GOCSPX-fake-client-secret-for-test",
+            project_id: "concierge-test-shim",
+            auth_uri: "https://accounts.google.com/o/oauth2/auth",
+            token_uri: "https://oauth2.googleapis.com/token",
+            redirect_uris: ["http://localhost"]
+          }
+        }' > "$tmp" || {
+          rm -f "$tmp"
+          exit 1
+        }
+        mv "$tmp" "$target"
+        echo "Created OAuth client for project: concierge-test-shim"
+        exit 0
+        ;;
+      login)
+        require_jq
+        require_test_dir
+        # Walk flags. We require --services <csv> to mirror real gws.
+        services_csv=""
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --services)
+              services_csv="${2:-}"
+              shift 2 || usage_error "auth login (missing --services value)"
+              ;;
+            --scopes)
+              # Real-gws would have accepted scope URLs here; shim mirrors the
+              # CLAUDE.md guidance that --scopes for short-names is wrong.
+              echo "Error 400: invalid_scope (use --services for short names)" >&2
+              exit 1
+              ;;
+            -*)
+              usage_error "auth login (unknown flag $1)"
+              ;;
+            *)
+              usage_error "auth login (unexpected positional $1)"
+              ;;
+          esac
+        done
+
+        if [[ -z "$services_csv" ]]; then
+          usage_error "auth login (missing --services)"
+        fi
+
+        # Port-collision simulation for orchestrator N4 path.
+        if [[ "${CONCIERGE_TEST_GWS_PORT_COLLISION:-}" = "1" ]]; then
+          echo "error: bind: address already in use (port 8080)" >&2
+          exit 1
+        fi
+
+        user="${CONCIERGE_TEST_GWS_USER:-test@example.com}"
+        target="$CONCIERGE_TEST_GWS_DIR/auth-status.json"
+        tmp="$(mktemp "${target}.XXXXXX")" || {
+          echo "Error: failed to create tempfile" >&2
+          exit 1
+        }
+        if ! jq -n \
+          --arg user "$user" \
+          --argjson scopes "$DEFAULT_SCOPES_JSON" \
+          '{
+            user: $user,
+            scopes: $scopes,
+            token_valid: true,
+            encrypted_credentials_exists: true,
+            project_id: "concierge-test-shim"
+          }' > "$tmp"; then
+          rm -f "$tmp"
+          exit 1
+        fi
+        mv "$tmp" "$target"
+        scope_count="$(echo "$DEFAULT_SCOPES_JSON" | jq 'length')"
+        echo "Authenticated $user ($scope_count scopes granted)"
+        exit 0
+        ;;
+      status)
+        # status is a read; we only need the dir to know where to look.
+        if [[ -z "${CONCIERGE_TEST_GWS_DIR:-}" ]]; then
+          echo 'Error: $CONCIERGE_TEST_GWS_DIR not set; refusing to touch ~/.config/gws.' >&2
+          exit 2
+        fi
+        target="$CONCIERGE_TEST_GWS_DIR/auth-status.json"
+        if [[ ! -f "$target" ]]; then
+          echo "error: no credentials found" >&2
+          exit 2
+        fi
+        cat "$target"
+        exit 0
+        ;;
+      *)
+        usage_error "auth $sub $*"
+        ;;
+    esac
+    ;;
+  *)
+    usage_error "$*"
+    ;;
+esac

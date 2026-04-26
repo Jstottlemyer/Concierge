@@ -3,13 +3,50 @@ title: Concierge — Google Workspace for Claude Desktop
 description: Gives Claude Desktop write capabilities to Google web services — Gmail, Drive, Docs, Sheets, Slides, Forms, Calendar, Tasks, Chat, Meet, People, and Apps Script.
 ---
 
-# Concierge
-
 **Gives Claude Desktop write capabilities to Google web services.**
 
 Concierge is a [Claude Desktop](https://claude.ai/download) extension that lets Claude **send emails, create and edit Google Docs / Sheets / Slides / Forms, upload to Drive, manage tasks, start Chat / Meet conversations**, and more — 42 typed tools across 12 Google Workspace services.
 
 Claude Desktop's built-in Google connectors focus on **reading and searching**. Concierge fills the gap: **writing and creating**. Runs entirely on your Mac; your OAuth credentials never leave your machine.
+
+<p align="center" style="margin: 2em 0;">
+  <a href="https://github.com/Jstottlemyer/Concierge/releases/latest" style="display:inline-block; padding: 0.75em 1.5em; background: #0366d6; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">↓ Download for macOS</a>
+  &nbsp;&nbsp;
+  <a href="#install">One-line install</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/Jstottlemyer/Concierge">Source on GitHub</a>
+</p>
+
+<!--
+  HERO ASSET — drop a screenshot or 30-second GIF of Claude Desktop completing
+  one of the example prompts below directly here. Recommended: 1200×600 PNG, or
+  animated GIF/MP4. Save under docs/assets/ and reference as:
+      ![Concierge in action](assets/hero.png)
+  Until then, the page reads as text-only — adding the hero asset is the single
+  highest-leverage visual change.
+-->
+
+---
+
+## Built-in connectors vs Concierge
+
+| | Anthropic's hosted connectors | Concierge |
+|---|---|---|
+| **Focus** | Read · Search · Analyze | Write · Create · Send |
+| **Data path** | Routed through Anthropic | Your Mac ↔ Google directly |
+| **OAuth client** | Anthropic-owned | Yours, in your own GCP project |
+| **Services** | Gmail · Calendar · Drive | + Docs · Sheets · Slides · Forms · Tasks · Chat · Meet · People · Apps Script |
+| **Install** | Built in | One-click `.mcpb` |
+
+---
+
+## Why trust this
+
+| 🍎 Signed by Apple | 🛡 Notarized by Apple | 🔒 Stays on your Mac |
+|---|---|---|
+| Developer ID Application certificate — verified publisher identity | Apple-scanned for malware — Gatekeeper opens it cleanly, no warnings | Your Google login lives in macOS Keychain. Anthropic never sees your mail or files. |
+
+Every release is also published with [SLSA build-provenance attestations](https://github.com/Jstottlemyer/Concierge/releases/latest) — you can independently verify the binary came from this source code. [Verification recipe →](https://github.com/Jstottlemyer/Concierge#verify-your-download)
 
 ---
 
@@ -22,6 +59,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Jstottlemyer/Concierge/main/
 ```
 
 `setup.sh` walks you through Homebrew, the `gws` CLI, gcloud, your Google Cloud project + OAuth client, API enablement, and Claude Desktop install — skipping any step already done. Safe to re-run.
+
+> **Why is it safe to run this command?** The script's source is [public on GitHub](https://github.com/Jstottlemyer/Concierge/blob/main/scripts/setup.sh) and the `.mcpb` it installs is signed and notarized by Apple. Read the script before you run it if you'd like.
 
 Prefer manual? See [Quickstart](setup/quickstart.md) or [Full onboarding](setup/user-onboarding.md).
 
@@ -54,6 +93,6 @@ All of it happens locally — Claude talks to the extension, the extension talks
 
 ---
 
-<p style="text-align:center; opacity:0.7; font-size:0.9em; margin-top:3em">
-  macOS (Apple Silicon) · Developer-ID signed · Apple notarized · SLSA build-provenance attested
+<p style="text-align:center; opacity:0.6; font-size:0.85em; margin-top:3em">
+  macOS (Apple Silicon)
 </p>

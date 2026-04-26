@@ -1,0 +1,27 @@
+#!/bin/bash
+# Test shim for the macOS `osascript` command.
+#
+# Used by Concierge claudeRegister.ts tests. Records its argv (one item per
+# line) into $CONCIERGE_TEST_OSASCRIPT_LOG so tests can assert correct
+# invocations. Always exits 0 unless $CONCIERGE_TEST_OSASCRIPT_EXIT_CODE is
+# set.
+#
+# Safety:
+#   - $CONCIERGE_TEST_OSASCRIPT_LOG MUST be set; otherwise the shim refuses
+#     (exit 2) so a stray test cannot quit the developer's running Claude.app.
+
+set -u
+
+if [[ -z "${CONCIERGE_TEST_OSASCRIPT_LOG:-}" ]]; then
+  echo 'Error: $CONCIERGE_TEST_OSASCRIPT_LOG not set; refusing to invoke real `osascript`.' >&2
+  exit 2
+fi
+
+{
+  echo "---"
+  for arg in "$@"; do
+    echo "$arg"
+  done
+} >> "$CONCIERGE_TEST_OSASCRIPT_LOG"
+
+exit "${CONCIERGE_TEST_OSASCRIPT_EXIT_CODE:-0}"

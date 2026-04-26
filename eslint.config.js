@@ -39,8 +39,12 @@ export default [
         setInterval: 'readonly',
         clearTimeout: 'readonly',
         clearInterval: 'readonly',
+        // Built-in WHATWG fetch + AbortController are stable in Node ≥20.
+        fetch: 'readonly',
+        AbortController: 'readonly',
         // tsup `define` replacements — see build-defines.d.ts.
         __CONCIERGE_VENDOR_VERSION__: 'readonly',
+        __CONCIERGE_SETUP_VERSION__: 'readonly',
         __CONCIERGE_CORE_VERSION__: 'readonly',
         __CONCIERGE_BUILD_TIME__: 'readonly',
         __CONCIERGE_BUILD_ID__: 'readonly',
@@ -54,6 +58,25 @@ export default [
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'error',
       'no-console': 'off',
+    },
+  },
+  // B6: enforce read-only boundary in src/io/readonly.ts. This module is the
+  // ONLY place ~/.config/gws/client_secret.json, ~/.claude.json, and the
+  // ~/Library/Application Support/Claude/ tree may be touched, and it must
+  // never write. Any import of a write/mutate operation from `fs` /
+  // `node:fs` / `fs/promises` / `node:fs/promises` here fails lint.
+  {
+    files: ['packages/*/src/io/readonly.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "ImportDeclaration[source.value=/^(node:)?fs(\\/promises)?$/] ImportSpecifier[imported.name=/^(writeFile|writeFileSync|appendFile|appendFileSync|mkdir|mkdirSync|rm|rmSync|rmdir|rmdirSync|unlink|unlinkSync|rename|renameSync|truncate|truncateSync|copyFile|copyFileSync|chmod|chmodSync|chown|chownSync|symlink|symlinkSync|link|linkSync|utimes|utimesSync|open|openSync|createWriteStream)$/]",
+          message:
+            'src/io/readonly.ts must not import write/mutate operations from fs. This module is the read-only boundary for files owned by other tools (gws, claude CLI, Claude Desktop).',
+        },
+      ],
     },
   },
 ];

@@ -78,6 +78,61 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  setup-orchestrator:
+    name: Setup orchestrator (macos-14)
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
+        with:
+          # Pinned to match `packageManager` field in package.json.
+          version: 10.33.0
+
+      - name: Setup Node 20 LTS
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Cache Homebrew
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
+        with:
+          path: |
+            ~/Library/Caches/Homebrew/api
+            ~/Library/Caches/Homebrew/downloads
+          key: brew-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: brew-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install fixture shims on PATH
+        run: |
+          chmod 755 tests/fixtures/bin/claude tests/fixtures/bin/gws
+          echo "${PWD}/tests/fixtures/bin" >> "$GITHUB_PATH"
+
+      - name: Verify shims override real binaries
+        run: |
+          which claude
+          which gws
+          claude --version  # should print "claude 1.0.42 (test shim)"
+          gws --version     # should print "gws 0.22.5 (test shim)"
+
+      - name: Typecheck
+        run: pnpm --filter @concierge/setup typecheck
+
+      - name: Lint
+        run: pnpm --filter @concierge/setup lint
+
+      - name: Unit tests + integration
+        env:
+          CONCIERGE_SETUP_INTEGRATION: '1'
+        run: pnpm --filter @concierge/setup test
+
   verify-gws-checksums:
     name: verify bundled gws sha256 pins
     runs-on: ubuntu-latest

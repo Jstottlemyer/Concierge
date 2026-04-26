@@ -95,6 +95,12 @@ v1 primary user: startup CEO (PashionFootwear). Gmail + Sheets + Forms are the h
   open -a Claude /path/to/Concierge-GoogleWorkspace-<version>-darwin-arm64.mcpb
   ```
 
+## Build/test gotchas
+
+- **`@concierge/core` redactor has TWO surfaces.** `redactString`/`redact` are credential-only (existing pre-D17 behavior; used for structured MCP payloads where breaking JSON shape matters). `redactStringForLog`/`redactForLog` add PII patterns (email, JWT subject, GCP project numbers, filesystem usernames) AND an unconditional "never-emit" hard list (refresh_token, client_secret, access_token, id_token bodies) that runs even when callers opt out of PII redaction. Code on the log/diagnose path MUST use `*ForLog` variants — credential-only leaks emails + paths.
+- **macOS does not ship `flock(1)` by default.** Brew has it via `util-linux` but it's keg-only and not guaranteed at orchestrator-launch time. Use pure-Node PID lockfile (`fs.openSync(path, 'wx')` + `kill -0` + `ps -o lstart=` cross-check to defeat PID-reuse) instead of shelling out to `flock`. See `packages/setup/src/lock.ts` for the pattern.
+- **vitest worker threads share `process.env`.** Tests that mutate env vars (notably `PATH`) MUST snapshot in `beforeEach` and restore in `afterEach`, or parallel test files will see each other's mutations. The `tests/fixtures/bin/*` shims (claude/gws/brew/npm/open/osascript) all live under one fixtures dir — keeping it on PATH for "happy path" tests but DROPPING it for "missing binary" tests requires this snapshot/restore discipline.
+
 ## Docs are dual-format
 
 - Every end-user setup flow ships in two docs: a prose version (`docs/setup/user-onboarding.md`) with context + troubleshooting, and a terminal recipe (`docs/setup/quickstart.md`) with minimal prose. Keep both in sync when changing setup steps.

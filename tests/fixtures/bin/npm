@@ -1,0 +1,82 @@
+#!/bin/bash
+# Test shim for the `npm` binary. Used by Concierge orchestrator tests for
+# `phases/install.ts` (C3) when exercising the npm-fallback path for the
+# `claude` CLI install (when `brew search claude-code` returns nothing).
+#
+# Real npm prints lengthy progress + npm-warn lines; we mimic the shape just
+# enough for SUT line-streaming tests to observe stdout.
+#
+# Safety:
+#   - `install` REQUIRES $CONCIERGE_TEST_NPM_LOG to point at a tempdir-scoped
+#     path. If unset, the shim refuses (exit 2) so a stray test cannot pretend
+#     to install a real global package.
+#
+# Behaviour controls:
+#   - CONCIERGE_TEST_NPM_LOG    : append-only log of received argv.
+#   - CONCIERGE_TEST_NPM_FAIL=1 : exit 1 with a synthetic stderr error.
+
+set -u
+
+require_log() {
+  if [[ -z "${CONCIERGE_TEST_NPM_LOG:-}" ]]; then
+    echo 'Error: $CONCIERGE_TEST_NPM_LOG not set; refusing to pretend to install.' >&2
+    exit 2
+  fi
+}
+
+log_call() {
+  # Tab-separated argv (see brew shim) so tests can assert exact arg shape.
+  local ts
+  ts="$(date +%Y-%m-%dT%H:%M:%S)"
+  local joined=""
+  local first=1
+  for a in "$@"; do
+    if [[ $first -eq 1 ]]; then
+      joined="$a"
+      first=0
+    else
+      joined="${joined}	${a}"
+    fi
+  done
+  printf '%s\t%s\n' "$ts" "$joined" >> "$CONCIERGE_TEST_NPM_LOG"
+}
+
+usage_error() {
+  echo "Error: test shim does not implement '$*'." >&2
+  exit 1
+}
+
+if [[ $# -eq 0 ]]; then
+  usage_error ""
+fi
+
+case "$1" in
+  --version)
+    echo "10.2.3"
+    exit 0
+    ;;
+  install)
+    shift
+    require_log
+    log_call install "$@"
+    pkg="(unknown)"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        -g|--global|--save|--save-dev) shift ;;
+        -*) shift ;;
+        *) pkg="$1"; shift ;;
+      esac
+    done
+    printf 'npm warn deprecated something@1.0.0 (test shim)\n'
+    printf 'added 1 package in 0s\n'
+    if [[ "${CONCIERGE_TEST_NPM_FAIL:-}" = "1" ]]; then
+      echo "npm error: install failed for ${pkg} (test shim)" >&2
+      exit 1
+    fi
+    printf 'installed %s\n' "$pkg"
+    exit 0
+    ;;
+  *)
+    usage_error "$*"
+    ;;
+esac
