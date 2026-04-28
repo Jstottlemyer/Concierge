@@ -1,3 +1,8 @@
+---
+title: Quickstart
+description: One-command setup for terminal users
+---
+
 # Concierge — Quickstart
 
 For terminal users who want the condensed recipe. Full prose + troubleshooting:
