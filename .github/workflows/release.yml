@@ -1,0 +1,420 @@
+# Coordinated release pipeline (setup-hardening-v2 F1).
+#
+# Purpose:
+#   Produces BOTH the .mcpb (Google Workspace vendor bundle) AND the
+#   @concierge/setup tarball + cosign signatures, then atomically uploads
+#   all 5 artifacts to a single GitHub Release. Per spec acceptance N12,
+#   the release fails if ANY artifact fails to upload — installers must
+#   never see a partial release where the .mcpb exists but the setup
+#   tarball is missing (or vice versa).
+#
+# Fires on:
+#   - push of `release-v*.*.*` tag (the coordinated release tag).
+#     Example: `git tag release-v0.3.0 && git push --tags release-v0.3.0`
+#   - workflow_dispatch with a `tag` input — for end-to-end pre-release
+#     validation. Dispatch runs still produce signed artifacts (the
+#     reusable package-mcpb workflow signing gate is unified on the
+#     release-tag input, not GITHUB_REF), so use sparingly.
+#
+# Ordering:
+#   1. package-mcpb  (reusable workflow F0) — produces signed/notarized
+#      darwin-arm64 .mcpb attached to the release-v* tag.
+#   2. package-setup (macos-14)             — downloads the .mcpb,
+#      stages it into packages/setup/assets/, builds @concierge/setup,
+#      runs pack.sh to produce tarball + .sha256 + .sig + .pem.
+#   3. publish       (ubuntu-latest)        — atomically uploads all 5
+#      artifacts to the release via a single `gh release create` call.
+#
+# Coordination with ci.yml:
+#   The lint/typecheck/test/build green-bar already ran on the PR before
+#   this tag was created. We trust it and do NOT re-run those gates here.
+#   (package-mcpb still re-runs lint+test as a prereq within itself.)
+#
+# Spec refs:
+#   - docs/specs/setup-hardening-v2/spec.md §N12 (atomic release upload)
+#   - docs/specs/setup-hardening-v2/spec.md §N1  (release-v* tag convention)
+#   - docs/specs/setup-hardening-v2/plan.md F0 (reusable package-mcpb)
+#   - docs/specs/setup-hardening-v2/plan.md F1 (this file)
+#   - packages/setup/build/pack.sh           (E3b: tarball producer)
+#   - packages/setup/build/prepare-assets.sh (E3a: .mcpb → assets stager)
+name: release
+
+on:
+  push:
+    tags:
+      - 'release-v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Pre-existing release-v* tag to (re)build for end-to-end validation. The tag must already exist in the repo.'
+        required: true
+        default: 'release-v0.0.0-test'
+
+# Series-wide concurrency. We never want two coordinated releases racing
+# the notary queue or the gh release create step. cancel-in-progress=false
+# so an in-flight rc release finishes before a follow-up rc starts.
+concurrency:
+  group: release-coordinated
+  cancel-in-progress: false
+
+env:
+  # Opt into Node 24 runtime for JS actions (matches ci.yml + package-mcpb.yml).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Helper: derive the clean numeric version (`0.3.0`) from `release-v0.3.0`.
+  # Exposes it as an output for downstream jobs to consume in filenames,
+  # the reusable package-mcpb `version` input, and release titles.
+  # MUST run before package-mcpb so we pass a clean version (otherwise the
+  # .mcpb filename would read `...-release-v0.3.0-...`).
+  # ─────────────────────────────────────────────────────────────────────────
+  derive-version:
+    name: Derive numeric version from tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      version: ${{ steps.derive.outputs.version }}
+      tag: ${{ steps.derive.outputs.tag }}
+    steps:
+      - name: Derive version
+        id: derive
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          if [[ "$TAG" != release-v* ]]; then
+            echo "::error title=Invalid tag::expected release-v*.*.*, got '$TAG'"
+            exit 1
+          fi
+          VERSION="${TAG#release-v}"
+          echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "derived: tag=$TAG version=$VERSION"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 1: build the signed .mcpb via the reusable package-mcpb workflow.
+  # Depends on derive-version so we pass a clean numeric version (e.g.
+  # `0.3.0`) — package-mcpb.yml uses INPUT_VERSION verbatim as the
+  # filename suffix, so passing the raw tag would produce ugly filenames.
+  # The reusable workflow signs + notarizes, uploads as a workflow
+  # artifact named after `mcpb-path`, AND attaches to release-tag.
+  # ─────────────────────────────────────────────────────────────────────────
+  package-mcpb:
+    name: Package .mcpb (reusable)
+    needs: derive-version
+    uses: ./.github/workflows/package-mcpb.yml
+    with:
+      version: ${{ needs.derive-version.outputs.version }}
+      release-tag: ${{ needs.derive-version.outputs.tag }}
+      arch: darwin-arm64
+    secrets: inherit
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 2: build the @concierge/setup tarball + sigs.
+  #
+  # Runs on macos-14 (Apple Silicon) so cosign + setup orchestrator parity
+  # match the eventual user install environment. Requires id-token: write
+  # so cosign keyless OIDC can mint a Sigstore Fulcio cert.
+  # ─────────────────────────────────────────────────────────────────────────
+  package-setup:
+    name: Package @concierge/setup tarball
+    needs: [package-mcpb, derive-version]
+    runs-on: macos-14
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write   # cosign keyless OIDC
+    outputs:
+      tarball-path: ${{ steps.collect.outputs.tarball-path }}
+      sha256-path:  ${{ steps.collect.outputs.sha256-path }}
+      sig-path:     ${{ steps.collect.outputs.sig-path }}
+      pem-path:     ${{ steps.collect.outputs.pem-path }}
+      tarball-sha256: ${{ steps.collect.outputs.tarball-sha256 }}
+    steps:
+      - name: Checkout at tag
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          ref: ${{ needs.derive-version.outputs.tag }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node 20 LTS
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The reusable package-mcpb workflow uploaded the signed .mcpb as a
+      # workflow artifact named after `mcpb-path` (the filename itself,
+      # e.g. `Concierge-GoogleWorkspace-0.3.0-darwin-arm64.mcpb`). Pull
+      # it down into packages/google-workspace/dist/ where prepare-assets.sh
+      # expects to find it.
+      - name: Download signed .mcpb from package-mcpb job
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16  # v4
+        with:
+          name: ${{ needs.package-mcpb.outputs.mcpb-path }}
+          path: packages/google-workspace/dist/
+
+      - name: Verify .mcpb landed where prepare-assets expects
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -la packages/google-workspace/dist/
+          if ! ls packages/google-workspace/dist/*.mcpb >/dev/null 2>&1; then
+            echo "::error::no .mcpb found in packages/google-workspace/dist/ after download"
+            exit 1
+          fi
+          # Sanity-check the SHA matches what package-mcpb claimed.
+          expected="${{ needs.package-mcpb.outputs.mcpb-sha256 }}"
+          actual="$(shasum -a 256 packages/google-workspace/dist/*.mcpb | awk '{print $1}')"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::sha256 mismatch on downloaded .mcpb: expected=$expected actual=$actual"
+            exit 1
+          fi
+          echo "downloaded .mcpb sha256 verified: $actual"
+
+      - name: Stage .mcpb into setup assets (E3a)
+        run: bash packages/setup/build/prepare-assets.sh
+
+      - name: Build @concierge/setup
+        run: pnpm --filter @concierge/setup build
+
+      # cosign-installer pin: v3.7.0 commit. Update the SHA when bumping.
+      # TODO: pin SHA from sigstore/cosign-installer release notes if this
+      # SHA is stale at merge time. The version comment must match the SHA.
+      - name: Install cosign
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da  # v3.7.0
+
+      - name: Pack setup tarball + cosign sign (E3b)
+        run: bash packages/setup/build/pack.sh
+
+      # CRITICAL: pack.sh's output dir contains a literal `/` from the
+      # `@concierge/` org prefix in the filename, so the tarball lives at
+      # `packages/setup/dist-release/@concierge/setup-<v>-darwin-arm64.tar.gz`.
+      # Glob via `dist-release/@concierge/*` (or `dist-release/**/*`),
+      # NOT `dist-release/*.tar.gz` — that would miss everything.
+      - name: Collect output paths into job outputs
+        id: collect
+        shell: bash
+        run: |
+          set -euo pipefail
+          REL_DIR="packages/setup/dist-release/@concierge"
+          ls -la "${REL_DIR}/"
+          TARBALL="$(ls "${REL_DIR}"/setup-*-darwin-arm64.tar.gz | head -n1)"
+          if [[ -z "$TARBALL" ]]; then
+            echo "::error::no tarball found in ${REL_DIR}/"
+            exit 1
+          fi
+          ABS_TARBALL="$(cd "$(dirname "$TARBALL")" && pwd)/$(basename "$TARBALL")"
+          ABS_SHA="${ABS_TARBALL}.sha256"
+          ABS_SIG="${ABS_TARBALL}.sig"
+          ABS_PEM="${ABS_TARBALL}.pem"
+          for f in "$ABS_TARBALL" "$ABS_SHA" "$ABS_SIG" "$ABS_PEM"; do
+            if [[ ! -s "$f" ]]; then
+              echo "::error::expected output missing or empty: $f"
+              exit 1
+            fi
+          done
+          SHA="$(awk '{print $1}' "$ABS_SHA")"
+          {
+            echo "tarball-path=${ABS_TARBALL}"
+            echo "sha256-path=${ABS_SHA}"
+            echo "sig-path=${ABS_SIG}"
+            echo "pem-path=${ABS_PEM}"
+            echo "tarball-sha256=${SHA}"
+          } >> "$GITHUB_OUTPUT"
+          echo "tarball: $ABS_TARBALL"
+          echo "sha256:  $SHA"
+
+      # Upload as a workflow artifact so the publish job (on ubuntu) can
+      # download all 4 files. Name the artifact bundle so download-artifact
+      # in publish can grab everything in one shot.
+      - name: Upload setup artifacts bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: setup-release-bundle
+          path: |
+            packages/setup/dist-release/@concierge/setup-*-darwin-arm64.tar.gz
+            packages/setup/dist-release/@concierge/setup-*-darwin-arm64.tar.gz.sha256
+            packages/setup/dist-release/@concierge/setup-*-darwin-arm64.tar.gz.sig
+            packages/setup/dist-release/@concierge/setup-*-darwin-arm64.tar.gz.pem
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 3: atomically upload all 5 artifacts to the GitHub Release.
+  #
+  # `gh release create` is a single API call; if any single asset fails
+  # to upload, the entire create fails and the release is not published.
+  # This is exactly the atomicity the spec (N12) requires.
+  # ─────────────────────────────────────────────────────────────────────────
+  publish:
+    name: Publish coordinated release
+    needs: [package-mcpb, package-setup, derive-version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write   # gh release create
+    steps:
+      - name: Checkout (for gh CLI repo context)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          ref: ${{ needs.derive-version.outputs.tag }}
+          fetch-depth: 1
+
+      - name: Download .mcpb from package-mcpb
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16  # v4
+        with:
+          name: ${{ needs.package-mcpb.outputs.mcpb-path }}
+          path: ./release-assets/mcpb/
+
+      - name: Download setup bundle from package-setup
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16  # v4
+        with:
+          name: setup-release-bundle
+          path: ./release-assets/setup/
+
+      - name: Resolve all 5 asset paths
+        id: assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -la ./release-assets/mcpb/  ./release-assets/setup/
+
+          MCPB="$(ls ./release-assets/mcpb/*.mcpb | head -n1)"
+          TARBALL="$(ls ./release-assets/setup/setup-*-darwin-arm64.tar.gz | head -n1)"
+          SHA="${TARBALL}.sha256"
+          SIG="${TARBALL}.sig"
+          PEM="${TARBALL}.pem"
+
+          for f in "$MCPB" "$TARBALL" "$SHA" "$SIG" "$PEM"; do
+            if [[ ! -s "$f" ]]; then
+              echo "::error::missing/empty release asset: $f"
+              exit 1
+            fi
+          done
+
+          {
+            echo "mcpb=$MCPB"
+            echo "tarball=$TARBALL"
+            echo "sha=$SHA"
+            echo "sig=$SIG"
+            echo "pem=$PEM"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Compose release notes
+        id: notes
+        shell: bash
+        env:
+          MCPB_SHA: ${{ needs.package-mcpb.outputs.mcpb-sha256 }}
+          TARBALL_SHA: ${{ needs.package-setup.outputs.tarball-sha256 }}
+          MCPB_NAME: ${{ needs.package-mcpb.outputs.mcpb-path }}
+          VERSION: ${{ needs.derive-version.outputs.version }}
+          TAG: ${{ needs.derive-version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          TARBALL_BASENAME="$(basename "${{ steps.assets.outputs.tarball }}")"
+          NOTES_FILE="$(mktemp)"
+          cat > "$NOTES_FILE" <<EOF
+          ## Concierge ${TAG}
+
+          Coordinated release: signed .mcpb (Google Workspace vendor bundle) +
+          signed @concierge/setup tarball (one-command installer).
+
+          ### Artifacts (darwin-arm64)
+
+          | File | SHA-256 |
+          | ---- | ------- |
+          | \`${MCPB_NAME}\` | \`${MCPB_SHA}\` |
+          | \`${TARBALL_BASENAME}\` | \`${TARBALL_SHA}\` |
+
+          The setup tarball is also accompanied by a cosign keyless signature
+          (\`.sig\`) and Fulcio cert (\`.pem\`) so installers can verify Rekor
+          inclusion without trusting GitHub Releases CDN.
+
+          ### Verify (out-of-band)
+
+          \`\`\`sh
+          # mcpb integrity:
+          shasum -a 256 ${MCPB_NAME}
+          # expected: ${MCPB_SHA}
+
+          # setup tarball integrity:
+          shasum -a 256 ${TARBALL_BASENAME}
+          # expected: ${TARBALL_SHA}
+
+          # Or check via the bundled .sha256 file:
+          shasum -a 256 -c ${TARBALL_BASENAME}.sha256
+
+          # Cosign keyless verification of setup tarball:
+          cosign verify-blob \\
+            --certificate ${TARBALL_BASENAME}.pem \\
+            --signature   ${TARBALL_BASENAME}.sig \\
+            --certificate-identity-regexp 'https://github.com/${{ github.repository }}/' \\
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \\
+            ${TARBALL_BASENAME}
+          \`\`\`
+
+          ### Install
+
+          See \`docs/setup/quickstart.md\` for the one-command installer that
+          consumes the setup tarball.
+          EOF
+          echo "notes-file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Atomic upload (N12). Single `gh release create` invocation; if any
+      # asset upload fails, the release is not created and the workflow
+      # fails. Re-running the workflow after fixing the underlying issue
+      # is safe because the tag is immutable and the release does not
+      # yet exist.
+      # ─────────────────────────────────────────────────────────────────────
+      - name: Atomically create release with all 5 assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.derive-version.outputs.tag }}
+          VERSION: ${{ needs.derive-version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # If a draft release already exists for this tag (e.g. created by
+          # the reusable package-mcpb workflow's softprops/action-gh-release
+          # step), upload assets onto it atomically instead. We can't simply
+          # `gh release create` because that would conflict.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists (likely draft from package-mcpb) — uploading remaining assets atomically"
+            # Upload all 5 in one call. --clobber so re-runs are idempotent
+            # over the .mcpb that package-mcpb already attached.
+            gh release upload "$TAG" \
+              "${{ steps.assets.outputs.mcpb }}" \
+              "${{ steps.assets.outputs.tarball }}" \
+              "${{ steps.assets.outputs.sha }}" \
+              "${{ steps.assets.outputs.sig }}" \
+              "${{ steps.assets.outputs.pem }}" \
+              --clobber
+            # Replace notes with the coordinated notes (which include both SHAs).
+            gh release edit "$TAG" \
+              --title "Concierge $TAG" \
+              --notes-file "${{ steps.notes.outputs.notes-file }}" \
+              --draft=false
+          else
+            gh release create "$TAG" \
+              --title "Concierge $TAG" \
+              --notes-file "${{ steps.notes.outputs.notes-file }}" \
+              "${{ steps.assets.outputs.mcpb }}" \
+              "${{ steps.assets.outputs.tarball }}" \
+              "${{ steps.assets.outputs.sha }}" \
+              "${{ steps.assets.outputs.sig }}" \
+              "${{ steps.assets.outputs.pem }}"
+          fi
+          echo "released $TAG with all 5 assets"

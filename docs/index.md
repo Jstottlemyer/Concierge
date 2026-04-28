@@ -60,7 +60,15 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Jstottlemyer/Concierge/main/
 
 `setup.sh` walks you through Homebrew, the `gws` CLI, gcloud, your Google Cloud project + OAuth client, API enablement, and Claude Desktop install — skipping any step already done. Safe to re-run.
 
-> **Why is it safe to run this command?** The script's source is [public on GitHub](https://github.com/Jstottlemyer/Concierge/blob/main/scripts/setup.sh) and the `.mcpb` it installs is signed and notarized by Apple. Read the script before you run it if you'd like.
+**Pin to a specific version** (defaults to the latest release if `VERSION` is unset):
+
+```bash
+VERSION=2.0.0 bash <(curl -fsSL https://raw.githubusercontent.com/Jstottlemyer/Concierge/main/scripts/setup.sh)
+```
+
+Want to inspect the script before piping to bash? See the [Quickstart's verification path](setup/quickstart.md#verification) — download `setup.sh` separately, sha256-check it against the published hash, then run it.
+
+> **Why is it safe to run this command?** The script's source is [public on GitHub](https://github.com/Jstottlemyer/Concierge/blob/main/scripts/setup.sh) and the `.mcpb` it installs is signed and notarized by Apple. The setup binary the script downloads is verified inline with both sha256 and a Sigstore cosign signature. Read the script before you run it if you'd like.
 
 Prefer manual? See [Quickstart](setup/quickstart.md) or [Full onboarding](setup/user-onboarding.md).
 
