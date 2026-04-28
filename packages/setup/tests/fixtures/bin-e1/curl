@@ -1,0 +1,68 @@
+#!/bin/bash
+# E1 test shim: emulates `curl -fsSL -o <out> <url>` by copying a fixture
+# from $CONCIERGE_TEST_FIXTURE_DIR keyed by the URL's basename.
+#
+# Required env:
+#   CONCIERGE_TEST_FIXTURE_DIR : dir containing the canned tarball + .sha256 + .sig + .pem
+#   TEST_LOG                   : append-only log of received argv (one line per call)
+#
+# Optional:
+#   CONCIERGE_TEST_CURL_FAIL=1 : fail every download (exit 22 like real curl on 404)
+
+set -u
+
+if [[ -n "${TEST_LOG:-}" ]]; then
+  printf 'curl\t%s\n' "$*" >> "$TEST_LOG"
+fi
+
+if [[ "${CONCIERGE_TEST_CURL_FAIL:-0}" = "1" ]]; then
+  echo "curl: (22) The requested URL returned error: 404 (test shim)" >&2
+  exit 22
+fi
+
+# Parse: -fsSL -o <out> <url> (last arg is url)
+out=""
+url=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o) out="$2"; shift 2 ;;
+    -*) shift ;;
+    *) url="$1"; shift ;;
+  esac
+done
+
+if [[ -z "$out" || -z "$url" ]]; then
+  echo "curl shim: missing -o or url" >&2
+  exit 2
+fi
+
+if [[ -z "${CONCIERGE_TEST_FIXTURE_DIR:-}" ]]; then
+  echo "curl shim: CONCIERGE_TEST_FIXTURE_DIR not set" >&2
+  exit 2
+fi
+
+# URL basename: handle the literal `@concierge/setup-...` path segment by
+# splitting on the last `/` we know is the release-base separator.
+# Real release URL: https://.../download/@concierge/setup-X-darwin-arm64.tar.gz
+# We want the suffix AFTER `/download/` (or after the test base url).
+suffix="${url##*/download/}"
+if [[ "$suffix" = "$url" ]]; then
+  # No /download/ marker (test base url) — strip everything up to the last "/test-release/"
+  suffix="${url##*/test-release/}"
+fi
+if [[ "$suffix" = "$url" ]]; then
+  # Final fallback: just take basename of url
+  suffix="$(basename "$url")"
+fi
+
+# Flatten the `@concierge/` subpath in the suffix so fixtures can live in a
+# flat directory keyed by basename (avoids needing a real `@concierge/` subdir).
+flat="$(basename "$suffix")"
+src="${CONCIERGE_TEST_FIXTURE_DIR}/${flat}"
+if [[ ! -f "$src" ]]; then
+  echo "curl shim: fixture not found at $src (url=$url)" >&2
+  exit 22
+fi
+
+cp "$src" "$out"
+exit 0

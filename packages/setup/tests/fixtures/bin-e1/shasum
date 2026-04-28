@@ -1,0 +1,12 @@
+#!/bin/bash
+# E1 test shim. Mimics `shasum -a 256 -c <file>.sha256`.
+# Returns 0 unless CONCIERGE_TEST_SHA_FAIL=1.
+set -u
+if [[ -n "${TEST_LOG:-}" ]]; then
+  printf 'shasum\t%s\n' "$*" >> "$TEST_LOG"
+fi
+if [[ "${CONCIERGE_TEST_SHA_FAIL:-0}" = "1" ]]; then
+  echo "shasum: WARNING: 1 computed checksum did NOT match (test shim)" >&2
+  exit 1
+fi
+exit 0
