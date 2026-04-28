@@ -1,0 +1,9 @@
+#!/bin/bash
+# E1 test shim: records what node was invoked with and exits 0.
+# The bootstrap's final step is `exec node <extract>/dist/index.js "$@"`, so
+# this shim's argv log is the primary success-assertion target.
+set -u
+if [[ -n "${TEST_LOG:-}" ]]; then
+  printf 'node\t%s\n' "$*" >> "$TEST_LOG"
+fi
+exit 0

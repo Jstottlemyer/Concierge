@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# E3b test stub for cosign. Writes synthetic .sig + .pem so pack.sh can verify
+# them as non-empty without needing a real Sigstore round-trip. Records argv
+# to a logfile (when CONCIERGE_TEST_COSIGN_LOG is set) for assertions.
+set -euo pipefail
+
+if [[ -n "${CONCIERGE_TEST_COSIGN_LOG:-}" ]]; then
+  printf 'cosign'; for a in "$@"; do printf ' %s' "$a"; done; printf '\n'
+fi >>"${CONCIERGE_TEST_COSIGN_LOG:-/dev/null}"
+
+# Parse --output-signature / --output-certificate flags. cosign accepts the
+# `--flag value` form, which is what pack.sh emits.
+SIG_PATH=""
+PEM_PATH=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --output-signature) SIG_PATH="$2"; shift 2 ;;
+    --output-certificate) PEM_PATH="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+if [[ -n "${SIG_PATH}" ]]; then
+  printf 'FAKE-SIGNATURE-BASE64==\n' >"${SIG_PATH}"
+fi
+if [[ -n "${PEM_PATH}" ]]; then
+  printf -- '-----BEGIN CERTIFICATE-----\nFAKEPEMBODY\n-----END CERTIFICATE-----\n' >"${PEM_PATH}"
+fi
+exit 0

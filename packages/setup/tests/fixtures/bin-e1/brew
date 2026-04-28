@@ -1,0 +1,8 @@
+#!/bin/bash
+# E1 test shim: just records and returns 0. Test asserts that the bootstrap
+# only called brew when the prereq command was missing from PATH.
+set -u
+if [[ -n "${TEST_LOG:-}" ]]; then
+  printf 'brew\t%s\n' "$*" >> "$TEST_LOG"
+fi
+exit 0

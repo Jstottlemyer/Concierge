@@ -1,0 +1,11 @@
+#!/bin/bash
+# E1 test shim. Returns 0 by default; CONCIERGE_TEST_COSIGN_FAIL=1 fails.
+set -u
+if [[ -n "${TEST_LOG:-}" ]]; then
+  printf 'cosign\t%s\n' "$*" >> "$TEST_LOG"
+fi
+if [[ "${CONCIERGE_TEST_COSIGN_FAIL:-0}" = "1" ]]; then
+  echo "cosign: signature verification failed (test shim)" >&2
+  exit 1
+fi
+exit 0
