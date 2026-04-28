@@ -28,11 +28,41 @@ One command on a fresh macOS:
 bash <(curl -fsSL https://raw.githubusercontent.com/Jstottlemyer/Concierge/main/scripts/setup.sh)
 ```
 
-`setup.sh` walks you through Homebrew, `gws`, gcloud, your Google Cloud project + OAuth client, API enablement, and Claude Desktop install — skipping any step already done. Idempotent; safe to re-run. Source at [`scripts/setup.sh`](./scripts/setup.sh).
+`setup.sh` is a tiny bootstrap: it downloads the signed `@concierge/setup` binary for your arch, verifies sha256 + cosign signature, and execs it. The binary then handles Homebrew, `gws`, gcloud, your Google Cloud project + OAuth client, API enablement, OAuth login, and the `.mcpb` install into Claude Desktop — skipping any step already done. Idempotent; safe to re-run. Source at [`scripts/setup.sh`](./scripts/setup.sh).
 
-Prefer manual? See:
-- [**Quickstart**](docs/setup/quickstart.md) — terminal recipe, ~10 min
-- [**Full onboarding**](docs/setup/user-onboarding.md) — prose + troubleshooting, ~15 min
+**Pin to a specific version** (defaults to the latest release if `VERSION` is unset):
+
+```bash
+VERSION=2.0.0 bash <(curl -fsSL https://raw.githubusercontent.com/Jstottlemyer/Concierge/main/scripts/setup.sh)
+```
+
+### Advanced: pin every artifact with `gh release download`
+
+Want no curl-to-bash anywhere in the chain? Download the setup binary tarball + its sha256 + cosign signature + cert directly from the release, verify locally, extract, and run by hand:
+
+```bash
+VERSION=2.0.0
+gh release download "release-v${VERSION}" \
+  --repo Jstottlemyer/Concierge \
+  --pattern "@concierge/setup-${VERSION}-darwin-arm64.tar.gz" \
+  --pattern "@concierge/setup-${VERSION}-darwin-arm64.tar.gz.sha256" \
+  --pattern "@concierge/setup-${VERSION}-darwin-arm64.tar.gz.sig" \
+  --pattern "@concierge/setup-${VERSION}-darwin-arm64.tar.gz.pem"
+shasum -a 256 -c "@concierge/setup-${VERSION}-darwin-arm64.tar.gz.sha256"
+cosign verify-blob \
+  --signature "@concierge/setup-${VERSION}-darwin-arm64.tar.gz.sig" \
+  --certificate "@concierge/setup-${VERSION}-darwin-arm64.tar.gz.pem" \
+  --certificate-identity-regexp '.*' \
+  --certificate-oidc-issuer-regexp '.*' \
+  "@concierge/setup-${VERSION}-darwin-arm64.tar.gz"
+mkdir -p /tmp/concierge-setup
+tar -xzf "@concierge/setup-${VERSION}-darwin-arm64.tar.gz" -C /tmp/concierge-setup
+node /tmp/concierge-setup/dist/index.js
+```
+
+Prefer the prose walkthrough? See:
+- [**Quickstart**](docs/setup/quickstart.md) — one-command recipe, ~5-10 min
+- [**Full onboarding**](docs/setup/user-onboarding.md) — what the orchestrator does + manual fallback
 
 ## Verify your download
 
