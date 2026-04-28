@@ -127,6 +127,10 @@ beforeEach(() => {
   // /usr/bin + /bin keep tar / mktemp / basename / cp / rm / mkdir resolvable.
   process.env['PATH'] = `${FIXTURE_BIN_DIR}:/usr/bin:/bin`;
   process.env['TEST_LOG'] = logPath;
+  // Default to Apple Silicon for every test so CI runners (ubuntu x86_64) don't
+  // hit the script's hard-bail on non-darwin-arm64. Tests that specifically
+  // exercise the bail (the x86 architecture test) override this explicitly.
+  process.env['CONCIERGE_TEST_ARCH'] = 'arm64';
 });
 
 afterEach(() => {
