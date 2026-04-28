@@ -50,4 +50,7 @@ export default defineConfig({
     __CONCIERGE_BUILD_TIME__: JSON.stringify(buildTime),
     __CONCIERGE_BUILD_ID__: JSON.stringify(buildId),
   },
+  // Preserve the `#!/usr/bin/env node` shebang on dist/index.js so the file
+  // is directly executable as the `concierge-setup` bin (D5).
+  banner: { js: '#!/usr/bin/env node' },
 });
