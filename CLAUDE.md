@@ -2,6 +2,11 @@
 
 Rules specific to this codebase. Apply in addition to user-level `~/CLAUDE.md`.
 
+## CI / branch gotchas
+
+- **Branch protection on `main` rejects direct push.** Every change goes through a PR (`gh pr create` from a feature branch). The error is opaque ("protected branch hook declined") — bit twice during setup-hardening-v2 wrap-up before the pattern stuck.
+- **ubuntu-latest GitHub runners leak `gcloud` and other tools through naive PATH isolation.** `/bin` is a symlink to `/usr/bin` (usrmerge), and gcloud lives at `/usr/bin/gcloud` (snap). Tests that need an "everything missing" PATH must (a) set PATH to a single empty dir (no `/bin`, no `/usr/bin`), and (b) use absolute `#!/bin/bash` shebangs in fixture shims so they don't need PATH to spawn bash. See `packages/setup/tests/phases/probe.test.ts:isolatePath`.
+
 ## Architecture
 
 - **Monorepo** (pnpm workspaces). Packages live in `packages/*`.
