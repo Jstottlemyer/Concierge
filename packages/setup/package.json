@@ -17,10 +17,14 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "probe-timing": "tsx scripts/probe-timing-harness.ts"
   },
   "dependencies": {
     "@concierge/core": "workspace:*",
     "@modelcontextprotocol/sdk": "latest"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
   }
 }

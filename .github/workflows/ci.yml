@@ -133,6 +133,12 @@ jobs:
           CONCIERGE_SETUP_INTEGRATION: '1'
         run: pnpm --filter @concierge/setup test
 
+      - name: Setup probe timing (regression alarm)
+        working-directory: packages/setup
+        env:
+          CONCIERGE_SETUP_INTEGRATION: '1'
+        run: pnpm probe-timing
+
   verify-gws-checksums:
     name: verify bundled gws sha256 pins
     runs-on: ubuntu-latest
