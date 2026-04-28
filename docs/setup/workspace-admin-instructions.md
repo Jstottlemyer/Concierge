@@ -1,4 +1,15 @@
+---
+title: Workspace Admin Approval
+description: Template request for Google Workspace Super Admins to approve Concierge for one user
+---
+
 # Concierge — Request for Admin Approval
+
+> **This is a template, not a request itself.** If you're a Concierge user on a Google Workspace domain, copy the message body below into an email or doc and replace every `<INSERT_…>` placeholder with your real values (your email, your domain, the OAuth client ID `setup.sh` printed for you). Then send it to your Workspace Super Admin.
+>
+> Coming back here as the admin? Skip past this notice and start at section 1 — the rest of the page is written to you.
+
+---
 
 **To:** Google Workspace Super Admin for `<INSERT_DOMAIN_HERE>`
 **From:** `<INSERT_USER_EMAIL>`

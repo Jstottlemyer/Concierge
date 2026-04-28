@@ -1,12 +1,32 @@
+---
+title: Full Setup Walkthrough
+description: One-time setup before installing Concierge into Claude Desktop — ~10 min with a Google account
+---
+
 # Concierge — First-time User Onboarding
 
 This is the one-time setup a user runs **before** installing the Concierge `.mcpb` into Claude Desktop. It provisions a Google Cloud OAuth client and authenticates the `gws` CLI that Concierge wraps. After this, everything is Desktop-native — you never need to touch a terminal again unless you want to.
 
 **Time:** ~10 minutes if you have a Google account; ~20 if you're creating a Google Cloud project from scratch.
 
-**Who this is for:** every new Concierge user, including Justin's own future setups on new machines and any third-party user who installs Concierge.
-
 > In a hurry and comfortable at a terminal? Use [`quickstart.md`](./quickstart.md) — same install, commands only. This doc is the prose + troubleshooting companion.
+
+---
+
+## On this page
+
+1. [Prerequisites](#prerequisites)
+2. [Step 1 — One-command setup (recommended)](#step-1--one-command-setup-recommended)
+3. [Step 2 — Create a Google Cloud project with an OAuth client](#step-2--create-a-google-cloud-project-with-an-oauth-client)
+4. [Step 3 — Write `client_secret.json` from copied values](#step-3--write-client_secretjson-from-copied-values-if-step-b4-download-failed)
+5. [Step 4 — Run OAuth login](#step-4--run-oauth-login)
+6. [Step 4.5 — Enable the Google Workspace APIs for your project](#step-45--enable-the-google-workspace-apis-for-your-project)
+7. [Step 5 — Verify](#step-5--verify)
+8. [Step 6 — Install Concierge into Claude Desktop](#step-6--install-concierge-into-claude-desktop)
+9. [Troubleshooting](#troubleshooting)
+10. [What's next](#whats-next)
+11. [Coexistence with claude.ai's Google connectors](#coexistence-with-claudeais-google-connectors-gmail--calendar--drive)
+12. [Claude Desktop's tool-approval dialog](#claude-desktops-tool-approval-dialog)
 
 ---
 

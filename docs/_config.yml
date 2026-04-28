@@ -1,0 +1,29 @@
+title: Concierge
+description: Google Workspace write-access for Claude Desktop
+theme: jekyll-theme-cayman
+url: https://jstottlemyer.github.io
+baseurl: /Concierge
+
+nav:
+  - title: Quickstart
+    url: /setup/quickstart.html
+  - title: Full Setup
+    url: /setup/user-onboarding.html
+  - title: Admin Approval
+    url: /setup/workspace-admin-instructions.html
+  - title: Troubleshooting
+    url: /troubleshooting.html
+  - title: GitHub
+    url: https://github.com/Jstottlemyer/Concierge
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
+exclude:
+  - specs/
+  - vendors/
+  - release/
+  - constitution.md
