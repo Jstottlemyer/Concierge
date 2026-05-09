@@ -5,8 +5,10 @@
 //
 //   - `runGws` uses `shell: false` and spawns via argv (no shell interpolation).
 //   - service / resource / method are validated with the existing
-//     `validateService` / `validateResource` / `validateMethod` regexes, which
-//     reject anything outside `^[a-z][a-zA-Z0-9_-]{0,48}$`.
+//     `validateService` / `validateResourcePath` / `validateMethod` regexes,
+//     which reject anything outside `^[a-z][a-zA-Z0-9_-]{0,48}$` (resource
+//     additionally allows up to 7 dot-separated segments for Discovery-style
+//     nested paths like `users.messages`).
 //   - `account`, if present, is validated as an RFC-5322-lite email.
 //   - `params` and `body` are JSON objects serialized once and passed inline as
 //     the single argv after `--params` / `--json`. Argv bypasses shell quoting
@@ -32,7 +34,7 @@ import { runGws, type RunResult } from '../../gws/runner.js';
 import { toolErrorFromGwsResult } from '../../gws/errors.js';
 import {
   validateService,
-  validateResource,
+  validateResourcePath,
   validateMethod,
   validateEmail,
   validateArgumentNotFlag,
@@ -68,8 +70,12 @@ export const GwsExecuteInputSchema = z
       .describe('Google Workspace service (e.g., drive, gmail, sheets, admin-reports).'),
     resource: z
       .string()
-      .regex(/^[a-z][a-zA-Z0-9_-]{0,48}$/)
-      .describe('Resource name per the service Discovery doc (e.g., files, messages, spaces).'),
+      .regex(/^[a-z][a-zA-Z0-9_-]{0,48}(\.[a-z][a-zA-Z0-9_-]{0,48}){0,7}$/)
+      .describe(
+        'Resource path per the service Discovery doc. Single segment for top-level resources ' +
+          '(e.g., files, spreadsheets) or dot-separated for nested ones ' +
+          '(e.g., users.messages, users.threads, users.labels for Gmail).',
+      ),
     method: z
       .string()
       .regex(/^[a-z][a-zA-Z0-9_-]{0,48}$/)
@@ -163,14 +169,17 @@ function validateExtraParams(
  */
 export function buildPassthroughArgv(args: GwsExecuteInput): string[] {
   const service = validateService(args.service);
-  const resource = validateResource(args.resource);
+  const resourceSegments = validateResourcePath(args.resource);
   const method = validateMethod(args.method);
   if (args.account !== undefined) {
     validateEmail(args.account);
   }
   const extraPairs = validateExtraParams(args.extra_params);
 
-  const argv: string[] = [service, resource, method];
+  // Spread resource segments so a Discovery-style dotted path like
+  // `users.messages` becomes `users messages` in argv — what the gws CLI
+  // expects for nested resources (e.g., `gws gmail users messages trash`).
+  const argv: string[] = [service, ...resourceSegments, method];
 
   if (args.account !== undefined) {
     argv.push('--account', args.account);

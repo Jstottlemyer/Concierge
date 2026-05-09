@@ -73,6 +73,35 @@ const VersionSchema = z
   })
   .strict();
 
+const GwsExecuteExampleSchema = z
+  .object({
+    want: z.string(),
+    service: z.string(),
+    resource: z.string(),
+    method: z.string(),
+    readonly: z.boolean(),
+    params_example: z.string(),
+  })
+  .strict();
+
+const GwsExecuteReferenceSchema = z
+  .object({
+    summary: z.string(),
+    input_shape: z.object({
+      service: z.string(),
+      resource: z.string(),
+      method: z.string(),
+      params: z.string(),
+      body: z.string(),
+      readonly: z.string(),
+      account: z.string(),
+    }).strict(),
+    resource_path_rules: z.array(z.string()),
+    examples: z.array(GwsExecuteExampleSchema),
+    notes: z.array(z.string()),
+  })
+  .strict();
+
 export const ConciergeHelpOutputSchema = z
   .object({
     welcome: z.string(),
@@ -80,6 +109,7 @@ export const ConciergeHelpOutputSchema = z
     getting_started: z.array(z.string()),
     troubleshooting_docs: z.array(TroubleshootingDocSchema),
     related_tools: z.array(RelatedToolSchema),
+    gws_execute_reference: GwsExecuteReferenceSchema,
     support: SupportSchema,
     version: VersionSchema,
   })
@@ -240,9 +270,174 @@ const RELATED_TOOLS: ReadonlyArray<z.infer<typeof RelatedToolSchema>> = [
   },
   {
     tool: 'gws_execute',
-    purpose: 'Power-user escape hatch — call any gws Discovery method not covered by a typed tool',
+    purpose:
+      'Power-user escape hatch — call any gws Discovery method not covered by a typed tool. ' +
+      'See gws_execute_reference in this output for the input shape, dotted resource paths, and recipes.',
   },
 ];
+
+// --------------------------------------------------------------------------
+// gws_execute reference — input shape + dotted-path conventions + recipes.
+// --------------------------------------------------------------------------
+//
+// Surfaces the passthrough's input contract so a future Claude session reading
+// `concierge_help` knows how to reach 4-level Discovery resources (Gmail
+// users.messages / users.threads / users.labels / users.drafts, plus
+// users.messages.attachments) without trial-and-error. Mirrors the regex in
+// `validators.validateResourcePath` and the argv-construction logic in
+// `gws_execute.buildPassthroughArgv`.
+
+const GWS_EXECUTE_REFERENCE: z.infer<typeof GwsExecuteReferenceSchema> = {
+  summary:
+    'gws_execute is the generic Discovery passthrough. Use it when no typed tool covers your need. ' +
+    'Resource accepts Discovery-style dotted paths so nested resources (e.g., gmail.users.messages) ' +
+    'are reachable. Each call requires a self-asserted `readonly` flag for Read-Only-mode enforcement.',
+  input_shape: {
+    service:
+      'Lowercase service id (e.g., "drive", "gmail", "sheets", "docs", "forms", "admin-reports", "chat").',
+    resource:
+      'Discovery resource path. Single segment for top-level resources ("files", "spreadsheets") or ' +
+      'dot-separated for nested ones ("users.messages", "users.threads", "users.labels", ' +
+      '"users.drafts", "users.messages.attachments"). Lowercase first character per segment, ' +
+      'up to 8 segments.',
+    method:
+      'Discovery method name (e.g., "list", "get", "create", "trash", "untrash", "modify", ' +
+      '"batchModify", "batchDelete", "send"). Lowercase first character.',
+    params:
+      'Optional JSON object of query/path params (camelCase keys per the Discovery doc). ' +
+      'For Gmail user-scoped calls, always include "userId": "me".',
+    body:
+      'Optional JSON object for POST/PATCH/PUT request bodies (e.g., label modifications, draft content).',
+    readonly:
+      'Required boolean. Caller asserts whether this call mutates state. Read-Only-mode middleware ' +
+      'cross-checks against the account flag and rejects writes when the account is in Read-Only mode.',
+    account:
+      'Optional authenticated email. Omit to use the gws default account.',
+  },
+  resource_path_rules: [
+    'Each dot-separated segment matches /^[a-z][a-zA-Z0-9_-]{0,48}$/ — same rules as service/method.',
+    'Path is split on "." and emitted as separate argv tokens, so "users.messages" → ' +
+      '"gws gmail users messages <method>".',
+    'Maximum 8 segments. Empty/leading/trailing dots and uppercase first chars are rejected.',
+    'Single-segment paths still work unchanged (e.g., resource:"files" for Drive).',
+  ],
+  examples: [
+    {
+      want: 'List Gmail messages matching a query',
+      service: 'gmail',
+      resource: 'users.messages',
+      method: 'list',
+      readonly: true,
+      params_example: '{"userId":"me","q":"is:unread newer_than:1d","maxResults":50}',
+    },
+    {
+      want: 'Read a single Gmail message (full body, base64url)',
+      service: 'gmail',
+      resource: 'users.messages',
+      method: 'get',
+      readonly: true,
+      params_example: '{"userId":"me","id":"<MESSAGE_ID>","format":"full"}',
+    },
+    {
+      want: 'Move a Gmail message to Trash (recoverable, preferred over delete)',
+      service: 'gmail',
+      resource: 'users.messages',
+      method: 'trash',
+      readonly: false,
+      params_example: '{"userId":"me","id":"<MESSAGE_ID>"}',
+    },
+    {
+      want: 'Restore a Gmail message from Trash',
+      service: 'gmail',
+      resource: 'users.messages',
+      method: 'untrash',
+      readonly: false,
+      params_example: '{"userId":"me","id":"<MESSAGE_ID>"}',
+    },
+    {
+      want: 'Add or remove labels on a Gmail message',
+      service: 'gmail',
+      resource: 'users.messages',
+      method: 'modify',
+      readonly: false,
+      params_example:
+        '{"userId":"me","id":"<MESSAGE_ID>"} + body: {"addLabelIds":["Label_42"],"removeLabelIds":["INBOX"]}',
+    },
+    {
+      want: 'Bulk-modify many messages in one call (up to 1000 ids)',
+      service: 'gmail',
+      resource: 'users.messages',
+      method: 'batchModify',
+      readonly: false,
+      params_example:
+        '{"userId":"me"} + body: {"ids":["id1","id2"],"addLabelIds":["TRASH"]}',
+    },
+    {
+      want: 'List Gmail threads',
+      service: 'gmail',
+      resource: 'users.threads',
+      method: 'list',
+      readonly: true,
+      params_example: '{"userId":"me","q":"from:alice@example.com"}',
+    },
+    {
+      want: 'Move a whole thread to Trash',
+      service: 'gmail',
+      resource: 'users.threads',
+      method: 'trash',
+      readonly: false,
+      params_example: '{"userId":"me","id":"<THREAD_ID>"}',
+    },
+    {
+      want: 'List Gmail labels',
+      service: 'gmail',
+      resource: 'users.labels',
+      method: 'list',
+      readonly: true,
+      params_example: '{"userId":"me"}',
+    },
+    {
+      want: 'Create a Gmail label',
+      service: 'gmail',
+      resource: 'users.labels',
+      method: 'create',
+      readonly: false,
+      params_example: '{"userId":"me"} + body: {"name":"Receipts","labelListVisibility":"labelShow"}',
+    },
+    {
+      want: 'List Gmail drafts',
+      service: 'gmail',
+      resource: 'users.drafts',
+      method: 'list',
+      readonly: true,
+      params_example: '{"userId":"me"}',
+    },
+    {
+      want: 'Download a message attachment',
+      service: 'gmail',
+      resource: 'users.messages.attachments',
+      method: 'get',
+      readonly: true,
+      params_example: '{"userId":"me","messageId":"<MSG>","id":"<ATTACHMENT_ID>"}',
+    },
+    {
+      want: 'Drive: list files (single-segment resource — no change)',
+      service: 'drive',
+      resource: 'files',
+      method: 'list',
+      readonly: true,
+      params_example: '{"pageSize":25,"q":"mimeType=\'application/pdf\'"}',
+    },
+  ],
+  notes: [
+    'Prefer typed tools (gmail_triage, gmail_send, gmail_reply, drive_files_list, etc.) when one exists — they handle pagination, redaction, and ergonomics automatically.',
+    'Trash before delete: prefer users.messages.trash / users.threads.trash. The raw `delete` method is permanent and irreversible.',
+    'Always include "userId":"me" in params for Gmail and Calendar user-scoped calls — gws does not infer it.',
+    'Set `readonly: false` for any method that mutates state (trash, untrash, modify, create, update, send, batchDelete, batchModify). Set `readonly: true` only for pure reads (list, get).',
+    'Read-Only mode: if the account is in Read-Only mode and you call gws_execute with `readonly: false`, the middleware rejects the call before the subprocess runs.',
+    'Source of truth for resource/method names is the Google Discovery doc. The gws CLI mirrors that hierarchy 1:1.',
+  ],
+};
 
 const SUPPORT: z.infer<typeof SupportSchema> = {
   developer: 'Justin Stottlemyer',
@@ -288,6 +483,13 @@ async function invoke(
     getting_started: [...GETTING_STARTED],
     troubleshooting_docs: TROUBLESHOOTING_DOCS.map((d) => ({ ...d })),
     related_tools: RELATED_TOOLS.map((r) => ({ ...r })),
+    gws_execute_reference: {
+      summary: GWS_EXECUTE_REFERENCE.summary,
+      input_shape: { ...GWS_EXECUTE_REFERENCE.input_shape },
+      resource_path_rules: [...GWS_EXECUTE_REFERENCE.resource_path_rules],
+      examples: GWS_EXECUTE_REFERENCE.examples.map((e) => ({ ...e })),
+      notes: [...GWS_EXECUTE_REFERENCE.notes],
+    },
     support: { ...SUPPORT },
     version: { vendor, core, gws, build_time: buildTime, build_id: buildId },
   };

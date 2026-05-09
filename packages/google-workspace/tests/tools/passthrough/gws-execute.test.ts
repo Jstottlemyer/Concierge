@@ -242,6 +242,109 @@ describe('gws_execute — argv construction (pure)', () => {
     expect(argv).toContain('--corpora');
     expect(argv).toContain('user');
   });
+
+  it('expands a dotted resource path into separate argv segments', () => {
+    const argv = buildPassthroughArgv(
+      baseInput({
+        service: 'gmail',
+        resource: 'users.messages',
+        method: 'trash',
+        readonly: false,
+        params: { userId: 'me', id: 'abc123' },
+      }),
+    );
+    // gws gmail users messages trash --format json --params <json>
+    expect(argv.slice(0, 5)).toEqual(['gmail', 'users', 'messages', 'trash', '--format']);
+    expect(argv).toContain('--params');
+    const idx = argv.indexOf('--params');
+    expect(argv[idx + 1]).toBe(JSON.stringify({ userId: 'me', id: 'abc123' }));
+  });
+
+  it('expands users.threads into 4-level argv', () => {
+    const argv = buildPassthroughArgv(
+      baseInput({
+        service: 'gmail',
+        resource: 'users.threads',
+        method: 'trash',
+        readonly: false,
+        params: { userId: 'me', id: 'tid-1' },
+      }),
+    );
+    expect(argv.slice(0, 4)).toEqual(['gmail', 'users', 'threads', 'trash']);
+  });
+
+  it('expands users.labels for label list', () => {
+    const argv = buildPassthroughArgv(
+      baseInput({
+        service: 'gmail',
+        resource: 'users.labels',
+        method: 'list',
+        params: { userId: 'me' },
+      }),
+    );
+    expect(argv.slice(0, 4)).toEqual(['gmail', 'users', 'labels', 'list']);
+  });
+
+  it('expands a 3-segment dotted path (e.g. users.messages.attachments)', () => {
+    const argv = buildPassthroughArgv(
+      baseInput({
+        service: 'gmail',
+        resource: 'users.messages.attachments',
+        method: 'get',
+        params: { userId: 'me', messageId: 'm1', id: 'a1' },
+      }),
+    );
+    expect(argv.slice(0, 5)).toEqual([
+      'gmail',
+      'users',
+      'messages',
+      'attachments',
+      'get',
+    ]);
+  });
+
+  it('preserves single-segment behavior (no regression for drive/files/list)', () => {
+    const argv = buildPassthroughArgv(baseInput());
+    expect(argv).toEqual(['drive', 'files', 'list', '--format', 'json']);
+  });
+});
+
+describe('gws_execute — dotted resource path schema', () => {
+  it('schema accepts users.messages', () => {
+    const parsed = gwsExecute.input.safeParse(
+      baseInput({
+        service: 'gmail',
+        resource: 'users.messages',
+        method: 'trash',
+        readonly: false,
+      }),
+    );
+    expect(parsed.success).toBe(true);
+  });
+
+  it('schema rejects users..messages (empty middle segment)', () => {
+    const parsed = gwsExecute.input.safeParse(
+      baseInput({ resource: 'users..messages' }),
+    );
+    expect(parsed.success).toBe(false);
+  });
+
+  it('schema rejects trailing dot', () => {
+    const parsed = gwsExecute.input.safeParse(baseInput({ resource: 'users.' }));
+    expect(parsed.success).toBe(false);
+  });
+
+  it('schema rejects leading dot', () => {
+    const parsed = gwsExecute.input.safeParse(baseInput({ resource: '.users' }));
+    expect(parsed.success).toBe(false);
+  });
+
+  it('schema rejects uppercase nested segment', () => {
+    const parsed = gwsExecute.input.safeParse(
+      baseInput({ resource: 'users.Messages' }),
+    );
+    expect(parsed.success).toBe(false);
+  });
 });
 
 describe('gws_execute — subprocess invocation', () => {
@@ -381,6 +484,153 @@ describe('gws_execute — subprocess invocation', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.error_code).toBe('gws_error');
+  });
+
+  it('gmail users.messages trash routes through 4-level argv and returns parsed JSON', async () => {
+    const trashed = '{"id":"19e0da5ee5070cef","labelIds":["TRASH"]}';
+    mock = await installGwsMock({
+      scenarios: [
+        makeVersionScenario(),
+        {
+          matchArgs: [
+            'gmail',
+            'users',
+            'messages',
+            'trash',
+            '--format',
+            'json',
+            '--params',
+            JSON.stringify({ userId: 'me', id: '19e0da5ee5070cef' }),
+          ],
+          stdout: trashed,
+          exitCode: 0,
+        },
+      ],
+    });
+
+    const result = await gwsExecute.invoke(
+      baseInput({
+        service: 'gmail',
+        resource: 'users.messages',
+        method: 'trash',
+        readonly: false,
+        params: { userId: 'me', id: '19e0da5ee5070cef' },
+      }),
+      ctx,
+    );
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+    const data = result.data as { labelIds?: string[] };
+    expect(data.labelIds).toContain('TRASH');
+  });
+
+  it('gmail users.messages get works via 4-level argv', async () => {
+    const messageJson = '{"id":"m1","payload":{"body":{"data":"SGVsbG8="}}}';
+    mock = await installGwsMock({
+      scenarios: [
+        makeVersionScenario(),
+        {
+          matchArgs: [
+            'gmail',
+            'users',
+            'messages',
+            'get',
+            '--format',
+            'json',
+            '--params',
+            JSON.stringify({ userId: 'me', id: 'm1', format: 'full' }),
+          ],
+          stdout: messageJson,
+          exitCode: 0,
+        },
+      ],
+    });
+
+    const result = await gwsExecute.invoke(
+      baseInput({
+        service: 'gmail',
+        resource: 'users.messages',
+        method: 'get',
+        readonly: true,
+        params: { userId: 'me', id: 'm1', format: 'full' },
+      }),
+      ctx,
+    );
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+    const data = result.data as { payload?: { body?: { data?: string } } };
+    expect(data.payload?.body?.data).toBe('SGVsbG8=');
+  });
+
+  it('gmail users.threads trash works via 4-level argv', async () => {
+    mock = await installGwsMock({
+      scenarios: [
+        makeVersionScenario(),
+        {
+          matchArgs: [
+            'gmail',
+            'users',
+            'threads',
+            'trash',
+            '--format',
+            'json',
+            '--params',
+            JSON.stringify({ userId: 'me', id: 't1' }),
+          ],
+          stdout: '{"id":"t1"}',
+          exitCode: 0,
+        },
+      ],
+    });
+
+    const result = await gwsExecute.invoke(
+      baseInput({
+        service: 'gmail',
+        resource: 'users.threads',
+        method: 'trash',
+        readonly: false,
+        params: { userId: 'me', id: 't1' },
+      }),
+      ctx,
+    );
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+  });
+
+  it('gmail users.labels list works via 4-level argv', async () => {
+    mock = await installGwsMock({
+      scenarios: [
+        makeVersionScenario(),
+        {
+          matchArgs: [
+            'gmail',
+            'users',
+            'labels',
+            'list',
+            '--format',
+            'json',
+            '--params',
+            JSON.stringify({ userId: 'me' }),
+          ],
+          stdout: '{"labels":[{"id":"INBOX","name":"INBOX"}]}',
+          exitCode: 0,
+        },
+      ],
+    });
+
+    const result = await gwsExecute.invoke(
+      baseInput({
+        service: 'gmail',
+        resource: 'users.labels',
+        method: 'list',
+        readonly: true,
+        params: { userId: 'me' },
+      }),
+      ctx,
+    );
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+    const data = result.data as { labels?: { id: string }[] };
+    expect(data.labels?.[0]?.id).toBe('INBOX');
   });
 
   it('returns ok with null data when stdout is empty (side-effect call)', async () => {
