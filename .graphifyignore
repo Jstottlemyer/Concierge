@@ -1,16 +1,48 @@
-# Node / pnpm
-node_modules/
+# Default graphify ignore patterns (all owned projects inherit these)
+# Syntax: same as .gitignore
+
+# Build artifacts
 dist/
 build/
-*.tsbuildinfo
+out/
+target/
+.next/
+.nuxt/
+.svelte-kit/
+.turbo/
+.cache/
 
-# Test output
-coverage/
-
-# Built MCP bundles (binary, not source)
-*.mcpb
-
-# Standard
-graphify-out/
+# Dependency dirs
+node_modules/
+bower_components/
+vendor/
 .venv/
+venv/
+env/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Generated / compiled
+*.min.js
+*.min.css
+*.map
+*.generated.*
+*.pb.go
+*.pb.py
+
+# Logs & temp
+*.log
+*.tmp
 .DS_Store
+Thumbs.db
+
+# graphify itself
+graphify-out/
+
+# IDE state
+.idea/
+.vscode/
+*.iml

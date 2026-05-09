@@ -1,12 +1,12 @@
-# Graph Report - /Users/jstottlemyer/Projects/AuthTools  (2026-04-27)
+# Graph Report - /Users/jstottlemyer/Projects/AuthTools  (2026-05-09)
 
 ## Corpus Check
-- 240 files · ~209,820 words
+- 220 files · ~208,892 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 771 nodes · 1597 edges · 51 communities detected
-- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 96 edges (avg confidence: 0.8)
+- 801 nodes · 1627 edges · 57 communities detected
+- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 102 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -61,6 +61,12 @@
 - [[_COMMUNITY_Community 48|Community 48]]
 - [[_COMMUNITY_Community 49|Community 49]]
 - [[_COMMUNITY_Community 50|Community 50]]
+- [[_COMMUNITY_Community 51|Community 51]]
+- [[_COMMUNITY_Community 52|Community 52]]
+- [[_COMMUNITY_Community 53|Community 53]]
+- [[_COMMUNITY_Community 54|Community 54]]
+- [[_COMMUNITY_Community 55|Community 55]]
+- [[_COMMUNITY_Community 56|Community 56]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `googleworkspace/cli (gws)` - 62 edges
@@ -75,6 +81,8 @@
 10. `GW PRD Review` - 17 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `runHarness()` --calls--> `now()`  [INFERRED]
+  /Users/jstottlemyer/Projects/AuthTools/packages/setup/scripts/probe-timing-harness.ts → packages/google-workspace/src/auth/granted-bundles.ts
 - `inspectExistingLock()` --calls--> `now()`  [INFERRED]
   /Users/jstottlemyer/Projects/AuthTools/packages/setup/src/lock.ts → packages/google-workspace/src/auth/granted-bundles.ts
 - `main()` --calls--> `resolveUnpackedDistIndexJsPath()`  [INFERRED]
@@ -83,8 +91,6 @@
   packages/google-workspace/src/index.ts → /Users/jstottlemyer/Projects/AuthTools/packages/setup/src/paths.ts
 - `runInstallSteps()` --calls--> `now()`  [INFERRED]
   /Users/jstottlemyer/Projects/AuthTools/packages/setup/src/phases/install.ts → packages/google-workspace/src/auth/granted-bundles.ts
-- `timed()` --calls--> `now()`  [INFERRED]
-  /Users/jstottlemyer/Projects/AuthTools/packages/setup/src/phases/probe.ts → packages/google-workspace/src/auth/granted-bundles.ts
 
 ## Hyperedges (group relationships)
 - **OAuth first-run consent flow** — concept_oauth, concept_gws_cli, concept_client_secret, concept_project_id, concept_auto_consent, concept_progress_notif, concept_macos_keychain [EXTRACTED 0.95]
@@ -101,20 +107,20 @@ Cohesion: 0.08
 Nodes (89): GW Plan Check, Repo CLAUDE.md, 42 MCP tools (22+12+1+5+2), 48h CVE patch SLA, Local audit log (AAP-inspired), Auto-consent OAuth flow, Admin & Compliance bundle, Automation bundle (+81 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.06
-Nodes (31): invoke(), readBuildId(), readBuildTime(), readCoreVersion(), readSiblingPackageJsonVersion(), readVendorVersion(), readCallsSync(), safeParseCallRecord() (+23 more)
+Cohesion: 0.04
+Nodes (52): buildConsentScreen(), captureConsent(), detectedLabel(), estimateMinutes(), findProbe(), upgradeLabel(), fileContainsErrorLine(), isNodeError() (+44 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.05
-Nodes (48): buildConsentScreen(), captureConsent(), detectedLabel(), estimateMinutes(), findProbe(), upgradeLabel(), fileContainsErrorLine(), isNodeError() (+40 more)
+Cohesion: 0.06
+Nodes (25): buildArgv(), runGwsJson(), readCallsSync(), safeParseCallRecord(), loadGwsResponseFixture(), makeAdminReportsActivitiesListScenario(), makeAdminReportsUsageGetScenario(), makeChatSpacesListScenario() (+17 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.05
-Nodes (27): ensureBundleGranted(), findGrantedBundleForService(), mkCtx(), stubGrantedLookup(), stubProbe(), runBinary(), getGrantedBundlesForAccount(), listAuthenticatedAccounts() (+19 more)
-
-### Community 4 - "Community 4"
 Cohesion: 0.07
 Nodes (33): commandExists(), extractConciergeEntry(), findNewestSetupLog(), probeClaudeDesktopApp(), renderClaudeCliSection(), renderClaudeDesktopSection(), renderConciergeSection(), renderGcloudConfigSection() (+25 more)
+
+### Community 4 - "Community 4"
+Cohesion: 0.05
+Nodes (19): allDetectedProbes(), freshMachineProbes(), probe(), defaultSearchRoot(), discoverExternalProbes(), errMessage(), chooseClaudeInstaller(), defaultBinForTool() (+11 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.08
@@ -125,12 +131,12 @@ Cohesion: 0.08
 Nodes (22): showAdminGate(), renderBanner(), resolveVersion(), writeBanner(), parseConsentInput(), showConsent(), renderFailure(), writeFailure() (+14 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.06
-Nodes (16): invokeOrchestrator(), parseAndRunDiagnose(), resolveSetupVersion(), runCli(), bufferStream(), makeHarness(), unknownFlag(), main() (+8 more)
+Cohesion: 0.09
+Nodes (15): ensureBundleGranted(), findGrantedBundleForService(), mkCtx(), stubGrantedLookup(), stubProbe(), runBinary(), getGrantedBundlesForAccount(), listAuthenticatedAccounts() (+7 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.06
-Nodes (15): allDetectedProbes(), freshMachineProbes(), probe(), defaultSearchRoot(), discoverExternalProbes(), errMessage(), chooseClaudeInstaller(), defaultBinForTool() (+7 more)
+Cohesion: 0.08
+Nodes (9): registerManagementTools(), registerPassthroughTools(), registerShimTools(), createProgressEmitter(), interpolate(), renderStageMessage(), createConciergeServer(), buildConnectedClient() (+1 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.11
@@ -141,91 +147,91 @@ Cohesion: 0.21
 Nodes (21): isNodeError(), probeClaudeRegistration(), claudeMcpAdd(), claudeMcpRemove(), hardReinstallCli(), hardReinstallSequence(), isClaudeCliInstalled(), isClaudeDesktopInstalled() (+13 more)
 
 ### Community 11 - "Community 11"
+Cohesion: 0.18
+Nodes (17): buildCopyableCommand(), buildDocsUrl(), codeFor(), detectApiNotEnabled(), toolErrorFromGwsResult(), buildPassthroughArgv(), invoke(), validateExtraParams() (+9 more)
+
+### Community 12 - "Community 12"
+Cohesion: 0.12
+Nodes (10): invokeOrchestrator(), parseAndRunDiagnose(), resolveSetupVersion(), runCli(), bufferStream(), makeHarness(), unknownFlag(), main() (+2 more)
+
+### Community 13 - "Community 13"
 Cohesion: 0.24
 Nodes (20): compareSemverLt(), deriveAccountDomain(), makeVerifyPlaceholder(), parseSemverTuple(), probeApisEnabled(), probeAuthStatus(), probeBrew(), probeClaudeCli() (+12 more)
 
-### Community 12 - "Community 12"
-Cohesion: 0.26
-Nodes (7): acquireLock(), inspectExistingLock(), isLockFile(), isNodeError(), isPidAlive(), readLstartEpochSec(), tryCreate()
-
-### Community 13 - "Community 13"
+### Community 14 - "Community 14"
 Cohesion: 0.26
 Nodes (9): cacheIsFresh(), checkForUpdate(), defaultCachePath(), isNewerVersion(), parseSemverish(), readCache(), stripTagPrefix(), withTimeout() (+1 more)
 
-### Community 14 - "Community 14"
-Cohesion: 0.24
-Nodes (7): buildArgv(), runGwsJson(), buildCopyableCommand(), buildDocsUrl(), codeFor(), detectApiNotEnabled(), toolErrorFromGwsResult()
-
 ### Community 15 - "Community 15"
-Cohesion: 0.4
-Nodes (8): fail(), requireString(), validateAccountOptional(), validateArgumentNotFlag(), validateEmail(), validateMethod(), validateResource(), validateService()
+Cohesion: 0.26
+Nodes (7): acquireLock(), inspectExistingLock(), isLockFile(), isNodeError(), isPidAlive(), readLstartEpochSec(), tryCreate()
 
 ### Community 16 - "Community 16"
+Cohesion: 0.27
+Nodes (8): authInProgressProbe(), defaultAuthInProgressProbe(), findGwsAuthProcess(), isProcessAlive(), lockfilePresent(), readPidfile(), resolveConfigDirForProbe(), runPsListing()
+
+### Community 17 - "Community 17"
+Cohesion: 0.22
+Nodes (0): 
+
+### Community 18 - "Community 18"
 Cohesion: 0.25
 Nodes (3): FsError, normalize(), parentDir()
 
-### Community 17 - "Community 17"
+### Community 19 - "Community 19"
+Cohesion: 0.29
+Nodes (2): buildReleaseDir(), buildTarball()
+
+### Community 20 - "Community 20"
+Cohesion: 0.46
+Nodes (6): invoke(), readBuildId(), readBuildTime(), readCoreVersion(), readSiblingPackageJsonVersion(), readVendorVersion()
+
+### Community 21 - "Community 21"
 Cohesion: 0.43
 Nodes (5): canonicalPhrase(), normalizeConfirmationInput(), verifyConfirmation(), baseArgumentsFor(), buildConfirmationRequiredResponse()
 
-### Community 18 - "Community 18"
+### Community 22 - "Community 22"
 Cohesion: 0.33
 Nodes (0): 
 
-### Community 19 - "Community 19"
+### Community 23 - "Community 23"
 Cohesion: 0.83
 Nodes (3): getNextAction(), getUserMessage(), interpolate()
 
-### Community 20 - "Community 20"
-Cohesion: 0.5
-Nodes (0): 
-
-### Community 21 - "Community 21"
-Cohesion: 0.5
-Nodes (0): 
-
-### Community 22 - "Community 22"
-Cohesion: 0.5
-Nodes (0): 
-
-### Community 23 - "Community 23"
-Cohesion: 0.67
-Nodes (1): readCoreVersion()
-
 ### Community 24 - "Community 24"
-Cohesion: 0.67
+Cohesion: 0.5
 Nodes (0): 
 
 ### Community 25 - "Community 25"
-Cohesion: 1.0
-Nodes (2): exists(), isBundledState()
+Cohesion: 0.5
+Nodes (0): 
 
 ### Community 26 - "Community 26"
-Cohesion: 0.67
+Cohesion: 0.5
 Nodes (0): 
 
 ### Community 27 - "Community 27"
-Cohesion: 0.67
+Cohesion: 0.5
 Nodes (0): 
 
 ### Community 28 - "Community 28"
-Cohesion: 1.0
-Nodes (0): 
+Cohesion: 0.67
+Nodes (1): readCoreVersion()
 
 ### Community 29 - "Community 29"
-Cohesion: 1.0
+Cohesion: 0.67
 Nodes (0): 
 
 ### Community 30 - "Community 30"
 Cohesion: 1.0
-Nodes (0): 
+Nodes (2): exists(), isBundledState()
 
 ### Community 31 - "Community 31"
-Cohesion: 1.0
+Cohesion: 0.67
 Nodes (0): 
 
 ### Community 32 - "Community 32"
-Cohesion: 1.0
+Cohesion: 0.67
 Nodes (0): 
 
 ### Community 33 - "Community 33"
@@ -300,65 +306,91 @@ Nodes (0):
 Cohesion: 1.0
 Nodes (0): 
 
+### Community 51 - "Community 51"
+Cohesion: 1.0
+Nodes (0): 
+
+### Community 52 - "Community 52"
+Cohesion: 1.0
+Nodes (0): 
+
+### Community 53 - "Community 53"
+Cohesion: 1.0
+Nodes (0): 
+
+### Community 54 - "Community 54"
+Cohesion: 1.0
+Nodes (0): 
+
+### Community 55 - "Community 55"
+Cohesion: 1.0
+Nodes (0): 
+
+### Community 56 - "Community 56"
+Cohesion: 1.0
+Nodes (0): 
+
 ## Knowledge Gaps
 - **3 isolated node(s):** `Auto-consent OAuth flow`, `notifications/progress (MCP)`, `MCP session transcript fixture`
   These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `Community 28`** (2 nodes): `runShim()`, `claude-shim.test.ts`
+- **Thin community `Community 33`** (2 nodes): `runScript()`, `check-setup-sh-sync.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 29`** (2 nodes): `runShim()`, `gws-shim.test.ts`
+- **Thin community `Community 34`** (2 nodes): `runShim()`, `claude-shim.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 30`** (2 nodes): `parseChecksums()`, `build-artifacts.test.ts`
+- **Thin community `Community 35`** (2 nodes): `runShim()`, `gws-shim.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 31`** (1 nodes): `eslint.config.js`
+- **Thin community `Community 36`** (2 nodes): `parseChecksums()`, `build-artifacts.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 32`** (1 nodes): `vitest.config.ts`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 33`** (1 nodes): `user-messages.test.ts`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 34`** (1 nodes): `envelope.test.ts`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 35`** (1 nodes): `index.ts`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 36`** (1 nodes): `index.ts`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 37`** (1 nodes): `index.ts`
+- **Thin community `Community 37`** (1 nodes): `eslint.config.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 38`** (1 nodes): `vitest.config.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 39`** (1 nodes): `verify-mcp-server.js`
+- **Thin community `Community 39`** (1 nodes): `user-messages.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 40`** (1 nodes): `mcp-server.js`
+- **Thin community `Community 40`** (1 nodes): `envelope.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 41`** (1 nodes): `build-defines.d.ts`
+- **Thin community `Community 41`** (1 nodes): `index.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 42`** (1 nodes): `index.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 43`** (1 nodes): `error.ts`
+- **Thin community `Community 43`** (1 nodes): `index.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 44`** (1 nodes): `vitest.config.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 45`** (1 nodes): `redact-recursion.test.ts`
+- **Thin community `Community 45`** (1 nodes): `verify-mcp-server.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 46`** (1 nodes): `redact-whitelist.test.ts`
+- **Thin community `Community 46`** (1 nodes): `mcp-server.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 47`** (1 nodes): `index.test.ts`
+- **Thin community `Community 47`** (1 nodes): `build-defines.d.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 48`** (1 nodes): `build-defines.d.ts`
+- **Thin community `Community 48`** (1 nodes): `index.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 49`** (1 nodes): `redact-whitelist.ts`
+- **Thin community `Community 49`** (1 nodes): `error.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 50`** (1 nodes): `redact.ts`
+- **Thin community `Community 50`** (1 nodes): `vitest.config.ts`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 51`** (1 nodes): `redact-recursion.test.ts`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 52`** (1 nodes): `redact-whitelist.test.ts`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 53`** (1 nodes): `index.test.ts`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 54`** (1 nodes): `build-defines.d.ts`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 55`** (1 nodes): `redact-whitelist.ts`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 56`** (1 nodes): `redact.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `now()` connect `Community 3` to `Community 1`, `Community 8`, `Community 11`, `Community 12`, `Community 13`?**
-  _High betweenness centrality (0.174) - this node is a cross-community bridge._
-- **Why does `runInstallSteps()` connect `Community 8` to `Community 2`, `Community 3`?**
-  _High betweenness centrality (0.075) - this node is a cross-community bridge._
-- **Why does `runOrchestrator()` connect `Community 2` to `Community 4`, `Community 6`, `Community 7`, `Community 8`, `Community 10`, `Community 11`, `Community 12`, `Community 13`?**
-  _High betweenness centrality (0.072) - this node is a cross-community bridge._
+- **Why does `now()` connect `Community 7` to `Community 2`, `Community 4`, `Community 13`, `Community 14`, `Community 15`?**
+  _High betweenness centrality (0.184) - this node is a cross-community bridge._
+- **Why does `runInstallSteps()` connect `Community 4` to `Community 1`, `Community 7`?**
+  _High betweenness centrality (0.071) - this node is a cross-community bridge._
+- **Why does `runOrchestrator()` connect `Community 1` to `Community 3`, `Community 4`, `Community 6`, `Community 10`, `Community 12`, `Community 13`, `Community 14`, `Community 15`?**
+  _High betweenness centrality (0.069) - this node is a cross-community bridge._
 - **Are the 18 inferred relationships involving `runOrchestrator()` (e.g. with `readEmbeddedManifest()` and `acquireLock()`) actually correct?**
   _`runOrchestrator()` has 18 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `Auto-consent OAuth flow`, `notifications/progress (MCP)`, `MCP session transcript fixture` to the rest of the system?**
@@ -366,4 +398,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.08 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.06 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.04 - nodes in this community are weakly interconnected._

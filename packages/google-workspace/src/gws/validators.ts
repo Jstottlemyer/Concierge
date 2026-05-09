@@ -25,6 +25,15 @@ import { ConciergeError } from '@concierge/core/errors';
 /** Regex for `service` / `resource` / `method`. */
 const IDENT_RE = /^[a-z][a-zA-Z0-9_-]{0,48}$/;
 
+/**
+ * Regex for a Discovery-style dotted resource path
+ * (`users`, `users.messages`, `users.threads.messages`, ...). Each dot-separated
+ * segment must independently satisfy `IDENT_RE`. Capped at 8 segments so a
+ * pathological input cannot blow the argv vector.
+ */
+const RESOURCE_PATH_RE =
+  /^[a-z][a-zA-Z0-9_-]{0,48}(\.[a-z][a-zA-Z0-9_-]{0,48}){0,7}$/;
+
 /** Lightweight email match. Disallows whitespace and `<>` to kill header-style tokens. */
 const EMAIL_RE = /^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$/;
 
@@ -70,6 +79,26 @@ export function validateResource(value: unknown): string {
     fail(`resource '${s}' does not match ${IDENT_RE.toString()}`);
   }
   return s;
+}
+
+/**
+ * Validate a Discovery-style dotted resource path and return its segments.
+ *
+ * The gws CLI mirrors the Google Discovery doc's resource hierarchy: a Gmail
+ * message is `gmail users messages <method>` (4 levels), a Gmail label is
+ * `gmail users labels <method>`, etc. The MCP `gws_execute` tool accepts the
+ * intermediate path as a dotted string (`users.messages`, `users.threads`)
+ * which this helper splits into the argv segments the CLI expects.
+ *
+ * Returns the validated segments. Throws `ConciergeError('validation_error')`
+ * on any malformed segment.
+ */
+export function validateResourcePath(value: unknown): string[] {
+  const s = requireString(value, 'resource');
+  if (!RESOURCE_PATH_RE.test(s)) {
+    fail(`resource '${s}' does not match ${RESOURCE_PATH_RE.toString()}`);
+  }
+  return s.split('.');
 }
 
 /** Validate a gws `method` name (same regex as service). */

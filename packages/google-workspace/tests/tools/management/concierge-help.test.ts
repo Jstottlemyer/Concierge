@@ -107,6 +107,35 @@ describe('concierge_help invoke (happy path)', () => {
     // Related tools: pointers to concierge_info / list_accounts / etc.
     const relatedToolNames = parsed.related_tools.map((r) => r.tool);
     expect(relatedToolNames).toContain('concierge_info');
+    expect(relatedToolNames).toContain('gws_execute');
+
+    // gws_execute reference: documents the input shape, dotted resource paths,
+    // and the Gmail recipes that became reachable when buildPassthroughArgv
+    // gained 4-level support.
+    const ref = parsed.gws_execute_reference;
+    expect(ref.summary.length).toBeGreaterThan(0);
+    expect(ref.input_shape.resource).toMatch(/dot/i);
+    expect(ref.resource_path_rules.length).toBeGreaterThan(0);
+    expect(ref.examples.length).toBeGreaterThanOrEqual(8);
+
+    // Each Gmail dotted resource we just enabled appears at least once.
+    const exampleResources = ref.examples.map((e) => e.resource);
+    expect(exampleResources).toContain('users.messages');
+    expect(exampleResources).toContain('users.threads');
+    expect(exampleResources).toContain('users.labels');
+    expect(exampleResources).toContain('users.drafts');
+    expect(exampleResources).toContain('users.messages.attachments');
+
+    // Single-segment regression example is preserved so callers see the
+    // unchanged Drive shape too.
+    expect(exampleResources).toContain('files');
+
+    // Each example carries a self-asserted readonly + a params hint.
+    for (const ex of ref.examples) {
+      expect(typeof ex.readonly).toBe('boolean');
+      expect(ex.params_example.length).toBeGreaterThan(0);
+    }
+    expect(ref.notes.length).toBeGreaterThan(0);
 
     // Support block.
     expect(parsed.support.developer).toBe('Justin Stottlemyer');

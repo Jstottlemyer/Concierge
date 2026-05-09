@@ -10,6 +10,7 @@ import {
   validateEmail,
   validateMethod,
   validateResource,
+  validateResourcePath,
   validateService,
 } from '../../src/gws/validators.js';
 
@@ -63,6 +64,51 @@ describe('validateResource', () => {
 
   it.each(['', 'Files', '3messages', '--files', 'files/foo'])('rejects %s', (input) => {
     expectValidationError(() => validateResource(input));
+  });
+});
+
+describe('validateResourcePath', () => {
+  it('accepts a single-segment path and returns a one-element array', () => {
+    expect(validateResourcePath('files')).toEqual(['files']);
+    expect(validateResourcePath('messages')).toEqual(['messages']);
+  });
+
+  it.each([
+    ['users.messages', ['users', 'messages']],
+    ['users.threads', ['users', 'threads']],
+    ['users.labels', ['users', 'labels']],
+    ['users.drafts', ['users', 'drafts']],
+    ['users.messages.attachments', ['users', 'messages', 'attachments']],
+  ])('splits %s into %j', (input, expected) => {
+    expect(validateResourcePath(input)).toEqual(expected);
+  });
+
+  it.each([
+    '', // empty
+    '.users', // leading dot
+    'users.', // trailing dot
+    'users..messages', // empty middle segment
+    'Users.messages', // uppercase first segment
+    'users.Messages', // uppercase nested segment
+    '1users.messages', // leading digit
+    'users.1messages', // leading digit in nested segment
+    'users/messages', // slash separator
+    'users messages', // space separator
+    '--users.messages', // flag-prefixed
+  ])('rejects %s', (input) => {
+    expectValidationError(() => validateResourcePath(input));
+  });
+
+  it('caps depth at 8 segments', () => {
+    const ok = Array.from({ length: 8 }, (_, i) => `s${String(i)}`).join('.');
+    expect(validateResourcePath(ok)).toHaveLength(8);
+    const tooDeep = Array.from({ length: 9 }, (_, i) => `s${String(i)}`).join('.');
+    expectValidationError(() => validateResourcePath(tooDeep));
+  });
+
+  it('rejects non-string input', () => {
+    expectValidationError(() => validateResourcePath(42 as unknown as string));
+    expectValidationError(() => validateResourcePath(undefined as unknown as string));
   });
 });
 
