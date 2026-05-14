@@ -19,6 +19,7 @@ import {
   type HeartbeatHandle,
 } from './oauthWait.js';
 import { writeProbeProgress } from './probeProgress.js';
+import { renderPublishReminder } from './publishReminder.js';
 import { writeSuccess } from './success.js';
 import type { Locale } from './i18n.js';
 
@@ -80,7 +81,17 @@ export function createTerminalUI(options: TerminalUIOptions): UISink {
       await showAdminGate({ stdin, stdout, ascii }, text);
     },
 
-    showSuccess(text): void {
+    showPublishReminder(accountType): void {
+      // stopHeartbeat() is mandatory here — the OAuth-wait heartbeat is
+      // still running when this method fires (Phase 10 just succeeded). If
+      // we skipped the teardown the heartbeat dots would interleave with
+      // the reminder text. Matches the existing pattern in every other
+      // sink method.
+      stopHeartbeat();
+      stdout.write(renderPublishReminder(accountType, ascii) + '\n');
+    },
+
+    showSuccess(text, accountType): void {
       stopHeartbeat();
       // The orchestrator's text is informational ("Concierge is set up." or
       // "Concierge is set up. (Recovery succeeded after one retry.)"). We
@@ -89,7 +100,7 @@ export function createTerminalUI(options: TerminalUIOptions): UISink {
       // paths exit before this method.
       writeSuccess(
         { stdout, ascii },
-        { detail: text, desktopOk: true, cliOk: true },
+        { detail: text, desktopOk: true, cliOk: true, accountType },
       );
     },
 

@@ -64,7 +64,11 @@ import { openLogger } from '../src/log.js';
 import { runAllProbes } from '../src/phases/probe.js';
 import { buildConsentScreen, captureConsent } from '../src/phases/consent.js';
 import { planInstallSteps, runInstallSteps } from '../src/phases/install.js';
-import { runGwsAuthSetup, runGwsAuthLogin } from '../src/phases/oauth.js';
+import {
+  runGwsAuthSetup,
+  runGwsAuthLogin,
+  classifyAccountDomain,
+} from '../src/phases/oauth.js';
 import { registerClaude } from '../src/phases/claudeRegister.js';
 import { verifyInstall } from '../src/phases/verify.js';
 import { runRecovery } from '../src/phases/recover.js';
@@ -110,7 +114,10 @@ function makeRecordingUI(
     showAdminGate: async (text) => {
       record('showAdminGate', text);
     },
-    showSuccess: (text) => record('showSuccess', text),
+    showPublishReminder: (accountType) =>
+      record('showPublishReminder', accountType),
+    showSuccess: (text, accountType) =>
+      record('showSuccess', text, accountType),
     showFailure: (phase, message, copyable) =>
       record('showFailure', phase, message, copyable),
     showLockCollision: (pid, started) =>
@@ -317,14 +324,70 @@ describe('runOrchestrator', () => {
     );
     expect(probeEvents).toHaveLength(15);
     expect(methods).toContain('showOauthWait');
+    expect(methods).toContain('showPublishReminder');
     expect(methods).toContain('showSuccess');
     expect(releaseLock).toHaveBeenCalled();
-    // Order: banner before probe events; success at the end
+    // Order: banner before probe events; success at the end.
     const idxBanner = methods.indexOf('banner');
     const idxFirstProbe = methods.indexOf('showProbeProgress');
     const idxSuccess = methods.lastIndexOf('showSuccess');
     expect(idxBanner).toBeLessThan(idxFirstProbe);
     expect(idxSuccess).toBeGreaterThan(idxFirstProbe);
+    // AC#1/AC#2: post-OAuth publish reminder fires BEFORE the next phase
+    // (register), and BEFORE the final success screen.
+    const idxOauthWait = methods.indexOf('showOauthWait');
+    const idxPublishReminder = methods.indexOf('showPublishReminder');
+    expect(idxPublishReminder).toBeGreaterThan(idxOauthWait);
+    expect(idxPublishReminder).toBeLessThan(idxSuccess);
+    // accountType threaded through both the reminder and the success call;
+    // the default mock returns 'workspace'.
+    const publishCall = ui.calls.find(
+      (c) => c.method === 'showPublishReminder',
+    );
+    expect(publishCall?.args[0]).toBe('workspace');
+    const successCall = ui.calls.find((c) => c.method === 'showSuccess');
+    expect(successCall?.args[1]).toBe('workspace');
+  });
+
+  it('happy path (personal Gmail): showPublishReminder + showSuccess get accountType=personal', async () => {
+    // Override the classifier mock just for this case.
+    (classifyAccountDomain as Mock).mockReturnValueOnce('personal');
+    const { opts, ui } = defaultOpts();
+    const result = await runOrchestrator(opts);
+
+    expect(result.outcome).toBe('success');
+    const publishCall = ui.calls.find(
+      (c) => c.method === 'showPublishReminder',
+    );
+    expect(publishCall?.args[0]).toBe('personal');
+    const successCall = ui.calls.find((c) => c.method === 'showSuccess');
+    expect(successCall?.args[1]).toBe('personal');
+  });
+
+  it('AC#4: no showSuccess and no success-screen reminder when a post-OAuth phase fails', async () => {
+    // Force register-phase failure so OAuth succeeds but the final
+    // success screen never renders. The post-OAuth showPublishReminder is
+    // allowed to fire (publish is still required regardless of later
+    // failures); the success-screen reminder must NOT.
+    (registerClaude as Mock).mockResolvedValueOnce({
+      desktop: { status: 'failed', detail: 'simulated' },
+      cli: { status: 'registered', detail: 'ok' },
+    });
+
+    const { opts, ui } = defaultOpts();
+    const result = await runOrchestrator(opts);
+
+    expect(result.outcome).toBe('failure');
+    expect(result.failedPhase).toBe('register');
+    const methods = ui.calls.map((c) => c.method);
+    // No final success screen.
+    expect(methods).not.toContain('showSuccess');
+    // Exactly one publishReminder event — the post-OAuth one. The
+    // success-screen one was never emitted because showSuccess never ran.
+    const reminderEvents = ui.calls.filter(
+      (c) => c.method === 'showPublishReminder',
+    );
+    expect(reminderEvents).toHaveLength(1);
   });
 
   it('lock collision → outcome=lock_collision, exit 1, only showLockCollision called', async () => {

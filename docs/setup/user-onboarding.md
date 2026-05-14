@@ -164,6 +164,73 @@ automatically.
 
 ---
 
+## Required: publish your consent screen (long-lived tokens)
+
+**Do this once, immediately after auth completes.** Without this step, Google
+expires your refresh token **every 7 days** and you'll re-authenticate weekly
+forever.
+
+Why this is safe: you're the only user of your own Cloud project. Google does
+not require verification for self-use. Publishing the consent screen flips it
+from "Testing" (7-day token expiry) to "In production" (long-lived tokens —
+indefinite, only invalidated by 6 months unused, manual revoke, password
+change, or scope expansion).
+
+### Personal Gmail
+
+1. Open
+   [console.cloud.google.com/apis/credentials/consent](https://console.cloud.google.com/apis/credentials/consent)
+   for your Concierge project.
+2. Click **Publish app**. Confirm. Status flips from `Testing` → `In production`.
+3. Re-run the auth refresh once so the next token is minted under the new
+   policy:
+   ```bash
+   gws auth login --services gmail,drive,sheets,forms,calendar,docs,slides,chat,meet,people
+   ```
+4. Verify with `gws auth status` — `token_valid: true` and `project_id`
+   matches.
+
+You'll see one "Google hasn't verified this app" warning on first auth after
+publishing — click **Advanced → Go to \<app name\> (unsafe)**. Expected; only
+appears once.
+
+### Workspace account, you're an admin
+
+You have two options — option A is strictly better:
+
+- **A) (recommended) Pick `User type: Internal`** at consent screen creation
+  time, not External. Internal restricts the consent screen to users within
+  your Workspace domain only. Result: **zero "unverified app" warning, zero
+  verification process, ever**. The Publish button doesn't apply because
+  there's no public surface to publish.
+- **B) Stick with External + Publish** (same flow as Personal Gmail above)
+  if you've already set the type to External and don't want to recreate the
+  client.
+
+If you started with External by mistake and want to switch to Internal:
+delete the OAuth client + consent screen and re-run the orchestrator — it'll
+create a fresh consent screen and let you pick Internal.
+
+### Workspace account, you're not an admin
+
+The Publish step isn't yours to do. Your admin completes consent screen setup
+in their own console; if they followed the workspace-admin instructions, the
+consent screen is already correctly configured. If you hit a 7-day token
+expiry after they're done, ping them — they may need to pick Internal user
+type or trust the OAuth client in
+**Admin Console → Security → API controls → App access control**.
+
+### Verification (optional)
+
+You can confirm publishing took effect by checking the consent screen status
+in Cloud Console — `In production` (External + Published) or no Testing-mode
+banner (Internal) means long-lived tokens. The `gws auth status` output
+itself doesn't differentiate — token longevity is determined when Google
+mints the token, so the first refresh after publishing is the one that
+becomes long-lived.
+
+---
+
 ## Verifying the download
 
 Releases from `v2.0.0` onward are signed with both **Sigstore cosign** (the
@@ -476,6 +543,33 @@ open -a Claude path/to/Concierge-GoogleWorkspace-<version>-darwin-arm64.mcpb
 ### "Google hasn't verified this app" warning
 - Normal for Testing-mode apps. Click **Advanced → Go to \<app name\>
   (unsafe)**. Safe because it's your own Cloud project.
+- If you've already
+  [published your consent screen](#required-publish-your-consent-screen-long-lived-tokens),
+  this warning appears once on the next auth and then never again.
+
+### Auth keeps expiring every 7 days
+- Symptom: `gws auth login` works, then a week later tools start failing with
+  `invalid_grant: Token has been expired or revoked`. Every week, like
+  clockwork.
+- Cause: your OAuth consent screen is still in **Testing** mode. Google
+  expires refresh tokens after 7 days while the app is in Testing.
+- Fix: follow
+  [Publish your consent screen](#required-publish-your-consent-screen-long-lived-tokens)
+  above (one click + one re-auth). Tokens are long-lived after that.
+- This is a Google policy, not a Concierge bug.
+
+### Verification "Submit for verification" prompt — should I?
+- Short answer: **no**, not for personal or self-use Workspace use.
+- The Gmail full-access scopes Concierge requests are **restricted scopes**
+  (Google's highest review tier). Removing the unverified-app warning
+  requires a multi-month process: brand verification + sensitive-scope review
+  + a third-party CASA security assessment ($15k–$75k, ~3 months, annual
+  re-certification).
+- For a single user (you) clicking past one warning once after publishing,
+  it's wildly disproportionate. Skip.
+- Verification is only relevant if Concierge ever becomes a multi-tenant
+  product where strangers authenticate against a shared GCP project. That's
+  explicitly out of scope per [the constitution](../specs/constitution.md).
 
 ### Forgot to copy client_secret, Cloud Console hides it now
 - OAuth client page → click the client → **Reset client secret** → copy the new

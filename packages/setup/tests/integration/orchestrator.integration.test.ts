@@ -215,7 +215,10 @@ function makeRecordingUI(consentAccepted = true): RecordingUI {
     showAdminGate: async (text) => {
       record('showAdminGate', text);
     },
-    showSuccess: (text) => record('showSuccess', text),
+    showPublishReminder: (accountType) =>
+      record('showPublishReminder', accountType),
+    showSuccess: (text, accountType) =>
+      record('showSuccess', text, accountType),
     showFailure: (phase, message, copyable) =>
       record('showFailure', phase, message, copyable),
     showLockCollision: (pid, started) => record('showLockCollision', pid, started),

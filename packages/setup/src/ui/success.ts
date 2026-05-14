@@ -1,7 +1,10 @@
 // D3: Success screen — final block printed at the end of a happy run.
 
+import type { AccountType } from '../phases/oauth.js';
+
 import { g } from './glyphs.js';
 import { t } from './i18n.js';
+import { renderPublishReminder } from './publishReminder.js';
 
 export interface SuccessDeps {
   stdout: NodeJS.WritableStream;
@@ -13,6 +16,10 @@ export interface SuccessFacts {
   detail?: string;
   desktopOk: boolean;
   cliOk: boolean;
+  /** Account type — threads through to the publish-consent reminder
+   *  appended as the trailing block of `renderSuccess`. Required (no
+   *  default fallback) per spec. */
+  accountType: AccountType;
 }
 
 /** Resolve build_id with a dev-mode fallback. */
@@ -37,6 +44,12 @@ export function renderSuccess(facts: SuccessFacts, ascii: boolean): string {
   if (facts.detail !== undefined && facts.detail !== '') {
     lines.push(t('success.detail', { detail: facts.detail }));
   }
+  // Publish-consent reminder is the trailing block of the success screen
+  // so it survives terminal scroll if the user scrolled past the
+  // post-OAuth print. Blank line separates it from the success-screen
+  // body above.
+  lines.push('');
+  lines.push(renderPublishReminder(facts.accountType, ascii));
   return lines.join('\n');
 }
 

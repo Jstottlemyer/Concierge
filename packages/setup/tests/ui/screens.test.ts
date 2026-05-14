@@ -107,7 +107,7 @@ describe('installProgress', () => {
 describe('success', () => {
   it('renders success block with both targets passing', () => {
     const out = renderSuccess(
-      { desktopOk: true, cliOk: true },
+      { desktopOk: true, cliOk: true, accountType: 'workspace' },
       false,
     );
     expect(out).toContain('Concierge installed and verified');
@@ -115,23 +115,36 @@ describe('success', () => {
     expect(out).toContain('Claude Desktop:');
     expect(out).toContain('Claude CLI:');
     expect(out).toContain('Try `Use list_accounts`');
+    // Publish-consent reminder is the trailing block (workspace branch
+    // here because accountType: 'workspace').
+    expect(out).toContain('Next step: publish your consent screen');
+    expect(out).toContain('User type = External');
   });
 
   it('shows cross when a target failed', () => {
     const out = renderSuccess(
-      { desktopOk: false, cliOk: true },
+      { desktopOk: false, cliOk: true, accountType: 'personal' },
       true,
     );
     expect(out).toContain('Claude Desktop: X');
     expect(out).toContain('Claude CLI: OK');
+    // Personal branch of the reminder.
+    expect(out).toContain('prevents weekly re-login');
   });
 
   it('appends detail line when provided', () => {
     const out = renderSuccess(
-      { desktopOk: true, cliOk: true, detail: 'Recovered after retry.' },
+      {
+        desktopOk: true,
+        cliOk: true,
+        detail: 'Recovered after retry.',
+        accountType: 'workspace',
+      },
       true,
     );
     expect(out).toContain('Recovered after retry.');
+    // Reminder still appended after the detail line.
+    expect(out).toContain('Next step: publish your consent screen');
   });
 });
 

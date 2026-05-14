@@ -117,10 +117,71 @@ describe('createTerminalUI', () => {
       stdin: nullStdin(),
       ascii: true,
     });
-    ui.showSuccess('Concierge is set up.');
+    ui.showSuccess('Concierge is set up.', 'workspace');
     expect(out.output()).toContain('Concierge installed and verified');
     expect(out.output()).toContain('Concierge is set up.');
+    // Reminder block appended.
+    expect(out.output()).toContain('Next step: publish your consent screen');
     expect(err.output()).toBe('');
+  });
+
+  it('showPublishReminder writes the reminder block to stdout (personal)', () => {
+    const out = bufferStream();
+    const err = bufferStream();
+    const ui = createTerminalUI({
+      stdout: out.stream,
+      stderr: err.stream,
+      stdin: nullStdin(),
+      ascii: true,
+    });
+    ui.showPublishReminder('personal');
+    expect(out.output()).toContain('Next step: publish your consent screen');
+    expect(out.output()).toContain('prevents weekly re-login');
+    expect(out.output()).toContain(
+      'https://console.cloud.google.com/apis/credentials/consent',
+    );
+    expect(err.output()).toBe('');
+  });
+
+  it('showPublishReminder branches by accountType (workspace)', () => {
+    const out = bufferStream();
+    const err = bufferStream();
+    const ui = createTerminalUI({
+      stdout: out.stream,
+      stderr: err.stream,
+      stdin: nullStdin(),
+      ascii: true,
+    });
+    ui.showPublishReminder('workspace');
+    expect(out.output()).toContain('User type = External');
+    expect(out.output()).toContain("Internal users: you're done");
+    expect(err.output()).toBe('');
+  });
+
+  it('showPublishReminder stops the OAuth-wait heartbeat (no interleave)', () => {
+    const out = bufferStream();
+    const err = bufferStream();
+    const ui = createTerminalUI({
+      stdout: out.stream,
+      stderr: err.stream,
+      stdin: nullStdin(),
+      ascii: true,
+    });
+    // Start the OAuth heartbeat so the sink has one in-flight.
+    ui.showOauthWait('https://example.com/auth');
+    expect(out.output()).toContain('Browser opened');
+    const lengthBeforeReminder = out.output().length;
+    // Calling showPublishReminder must stop the heartbeat — if it didn't,
+    // dots would continue accumulating in the output stream after the
+    // reminder text. We then sleep a tick and assert that no dots have
+    // been appended between the reminder's end and now.
+    ui.showPublishReminder('personal');
+    const lengthAfterReminder = out.output().length;
+    expect(lengthAfterReminder).toBeGreaterThan(lengthBeforeReminder);
+    // The reminder block itself ends with a newline; no trailing heartbeat
+    // dot should be present after it.
+    const tail = out.output().slice(-50);
+    expect(tail).not.toMatch(/\.\s*$/);
   });
 
   it('showDiagnose passes text through to stdout verbatim', () => {
@@ -149,7 +210,7 @@ describe('createTerminalUI', () => {
     expect(out.output()).toContain('Browser opened');
     expect(out.output()).toContain('https://example.com/auth');
     // Following call should stop the heartbeat without throwing.
-    ui.showSuccess('done');
+    ui.showSuccess('done', 'workspace');
     expect(out.output()).toContain('Concierge installed and verified');
   });
 
