@@ -68,6 +68,27 @@ the onboarding doc.
 5. Final success screen with `concierge_info` + `list_accounts` test prompts to try
    in Claude Desktop.
 
+## Required: publish your consent screen (one click, prevents weekly re-auth)
+
+After the success screen, **before you close the browser tab:**
+
+```
+https://console.cloud.google.com/apis/credentials/consent
+```
+
+→ **Publish app** → confirm. Then re-run auth once so the new long-lived
+token is minted:
+
+```bash
+gws auth login --services gmail,drive,sheets,forms,calendar,docs,slides,chat,meet,people
+```
+
+Why: while the consent screen is in `Testing` mode, Google expires your
+refresh token every 7 days. Publishing makes tokens long-lived (indefinite,
+no verification needed for self-use). Workspace admins should instead pick
+`User type: Internal` at consent creation — zero unverified-app warning ever.
+Full context in [user-onboarding.md](./user-onboarding.md#required-publish-your-consent-screen-long-lived-tokens).
+
 ## Troubleshooting
 
 If anything fails mid-flow, the binary prints a recovery hint inline. For the full

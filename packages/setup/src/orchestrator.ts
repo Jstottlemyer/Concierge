@@ -35,6 +35,7 @@ import {
   runGwsAuthSetup,
   runGwsAuthLogin,
   classifyAccountDomain,
+  type AccountType,
 } from './phases/oauth.js';
 import { registerClaude } from './phases/claudeRegister.js';
 import { verifyInstall } from './phases/verify.js';
@@ -68,7 +69,14 @@ export interface UISink {
   ): void;
   showOauthWait(authUrl?: string): void;
   showAdminGate(text: string): Promise<void>;
-  showSuccess(text: string): void;
+  /** Publish-consent reminder block. Called once after `runGwsAuthLogin`
+   *  succeeds (between Phase 10 and Phase 11 — outside the OAuth try/catch
+   *  so a render failure can't mis-attribute as oauth.login failure) and
+   *  again as the trailing section of `showSuccess`. */
+  showPublishReminder(accountType: AccountType): void;
+  /** Final success screen. `accountType` threads through to the appended
+   *  publish-reminder block; required (no default fallback) per spec. */
+  showSuccess(text: string, accountType: AccountType): void;
   showFailure(
     phase: string,
     message: string,
@@ -632,6 +640,14 @@ export async function runOrchestrator(
     // ---------------------------------------------------------------------
     // Phase 10: gws auth login
     // ---------------------------------------------------------------------
+    // Hoisted out of the try block so the value is in scope for the
+    // post-Phase-10 publish-reminder call AND the Phase 13 success call.
+    // `AccountType | undefined` (not just `AccountType`) is required under
+    // TS strict definite-assignment — the variable is only written on the
+    // OAuth success branch; failure branches early-return before the
+    // post-try read sites. Reads use `!` because the invariant is
+    // statically guaranteed by those early returns.
+    let actualType: AccountType | undefined;
     try {
       ui.showOauthWait();
       const loginRes = await runGwsAuthLogin({
@@ -705,7 +721,7 @@ export async function runOrchestrator(
         };
       }
       // Success — confirm domain classification matches our expectation.
-      const actualType = classifyAccountDomain(loginRes.user);
+      actualType = classifyAccountDomain(loginRes.user);
       logger.info('oauth.login', 'authenticated', { actualType });
     } catch (err) {
       const msg = safeMsg(err);
@@ -719,6 +735,13 @@ export async function runOrchestrator(
         failedPhase: 'oauth.login',
       };
     }
+
+    // Publish-consent reminder — fires AFTER the OAuth try/catch closes so
+    // a render failure here can't mis-attribute as oauth.login failure
+    // (codex-adversary finding ck-1a2b3c4d5e). `actualType` is statically
+    // guaranteed to be set on this path: every failure branch above
+    // early-returns before reaching here.
+    ui.showPublishReminder(actualType!);
 
     // ---------------------------------------------------------------------
     // Phase 11: registerClaude
@@ -831,7 +854,10 @@ export async function runOrchestrator(
     const successText = recoveredAfterRetry
       ? 'Concierge is set up. (Recovery succeeded after one retry.)'
       : 'Concierge is set up.';
-    ui.showSuccess(successText);
+    // `actualType!` is safe — every Phase 10 failure branch early-returned
+    // above, so the only way to reach Phase 13 is via the OAuth success
+    // branch which assigned `actualType`.
+    ui.showSuccess(successText, actualType!);
     logger.info('orchestrator', 'success', {
       recoveredAfterRetry,
     });

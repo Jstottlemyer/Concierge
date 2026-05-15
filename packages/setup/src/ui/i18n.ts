@@ -53,6 +53,23 @@ const MESSAGES = {
 
     'probeLine.detected': 'Detected: {entries}',
     'probeLine.entry': '{name} {glyph}',
+
+    // Publish-consent reminder — printed after OAuth success and on the
+    // final success screen. Two branches: personal Gmail (must publish) and
+    // Workspace (publish-if-External, no-op-if-Internal). URL + doc anchor
+    // are renderer constants in publishReminder.ts (NOT in this table) so a
+    // future locale translator never "translates" a Google Cloud Console
+    // URL or a docs-repo anchor.
+    'publishReminder.personal.heading':
+      '{arrow} Next step: publish your consent screen — prevents weekly re-login (one click)',
+    'publishReminder.personal.urlLine': '  {url}  {arrow}  Publish app',
+    'publishReminder.personal.docLink': '  Full instructions: {anchor}',
+    'publishReminder.workspace.heading':
+      '{arrow} Next step: publish your consent screen if you picked User type = External',
+    'publishReminder.workspace.externalBranch':
+      '  {url}  {arrow}  Publish app',
+    'publishReminder.workspace.internalBranch':
+      "  (Internal users: you're done — tokens are already long-lived.)",
   },
 } as const;
 
