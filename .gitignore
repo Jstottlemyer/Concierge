@@ -62,7 +62,9 @@ Icon
 .parcel-cache/
 .eslintcache
 .turbo/
-graphify-out/cache/
+# graphify knowledge-graph outputs are generated locally (AST-only, free to
+# rebuild via `graphify update .`) — keep them out of git to avoid churn.
+graphify-out/
 
 # Claude / local scratch
 .claude/settings.local.json
