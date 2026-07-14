@@ -3,7 +3,7 @@
     <a href="{{ '/' | relative_url }}" class="site-nav__brand">Concierge</a>
     {% for item in site.nav %}
       {% assign item_url = item.url %}
-      {% assign is_external = item_url contains "://" %}
+      {% assign is_external = item.external %}
       {% if is_external %}
         <a href="{{ item_url }}" class="site-nav__link" rel="noopener">{{ item.title }}</a>
       {% else %}

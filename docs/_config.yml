@@ -15,6 +15,7 @@ nav:
     url: /troubleshooting.html
   - title: GitHub
     url: https://github.com/Jstottlemyer/Concierge
+    external: true
 
 defaults:
   - scope:
