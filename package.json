@@ -21,7 +21,6 @@
     "eslint": "^9.0.0",
     "tsup": "latest",
     "typescript": "^5.4.0",
-    "vitest": "latest",
-    "vite": "^7.0.0"
+    "vitest": "latest"
   }
 }
