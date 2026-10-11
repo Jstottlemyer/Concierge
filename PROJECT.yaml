@@ -1,0 +1,19 @@
+id: authtools
+name: Concierge
+aliases: [AuthTools]
+kind: project
+parent_ids: [personal]
+canonical_directory: /Users/jstottlemyer/Projects/AuthTools
+repository_url: https://github.com/Jstottlemyer/Concierge
+registry: /Users/jstottlemyer/Projects/PROJECTS.yaml
+maintenance_status: inactive
+sources:
+  current_state: STATUS.md
+  product_description: README.md
+  instructions: AGENTS.md
+execution_chat_id: 01a125d8-62c0-7b03-b7b6-2514d9348dbe
+description: Local Google Workspace MCP extension wrapping googleworkspace/cli, distributed as a macOS .mcpb.
+provenance:
+  identity: Registry routing, README title, and Git origin verified 2026-10-11.
+  maintenance: Justin stated on 2026-10-11 that he no longer plans to maintain this project.
+boundaries: Preserve existing sources; resume maintenance only on explicit user direction. No automatic product commits or pushes.
